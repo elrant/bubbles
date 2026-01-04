@@ -19,7 +19,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package cc.lunary.lib_swingify;
+package cc.lunary.swingify;
 
 import org.jetbrains.annotations.NotNull;
 
