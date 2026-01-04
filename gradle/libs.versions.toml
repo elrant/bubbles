@@ -1,0 +1,40 @@
+[versions]
+# annotations
+jetbrains-annotations = "26.0.2"
+
+# serialization
+jackson             = "2.20.0-rc1"
+jackson-annotations = "3.0-rc5"
+jackson-bom         = "2.20.0-rc1"
+jackson-parent      = "2.20-rc1"
+
+# misc
+
+[libraries]
+# annotations
+annotations         = { group = "org.jetbrains"             , name = "annotations"        , version.ref = "jetbrains-annotations" }
+jackson-annotations = { group = "com.fasterxml.jackson.core", name = "jackson-annotations", version.ref = "jackson-annotations" }
+jackson-bom         = { group = "com.fasterxml.jackson"     , name = "jackson-bom"        , version.ref = "jackson-bom" }
+jackson-parent      = { group = "com.fasterxml.jackson"     , name = "jackson-parent"     , version.ref = "jackson-parent" }
+
+# serialization
+jackson-core        = { group = "com.fasterxml.jackson.core", name = "jackson-core"       , version.ref = "jackson" }
+jackson-databind    = { group = "com.fasterxml.jackson.core", name = "jackson-databind"   , version.ref = "jackson" }
+
+# misc
+
+[bundles]
+annotations = [
+  "annotations",
+  "jackson-annotations",
+  "jackson-bom",
+  "jackson-parent"
+]
+
+serialization = [
+  "jackson-core",
+  "jackson-databind",
+  "jackson-annotations",
+  "jackson-bom",
+  "jackson-parent"
+]
