@@ -36,3 +36,7 @@ tasks.withType<AbstractArchiveTask> {
   isReproducibleFileOrder = true
   isPreserveFileTimestamps = false
 }
+
+tasks.jar {
+  manifest.attributes["Main-Class"] = "Bootstrap"
+}
