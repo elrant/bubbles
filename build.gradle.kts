@@ -22,7 +22,7 @@ dependencies {
     libs.bundles.serialization,
     libs.bundles.logging,
     libs.bundles.xmpp,
-    libs.bundles.themes,
+    libs.bundles.swing,
   ).forEach { implementation(it); shadow(it) }
 }
 

@@ -52,7 +52,7 @@ public class ConnectedUser extends AbstractUser {
    *
    * @param file the file path
    * @throws IOException            the io exception
-   * @throws ClassNotFoundException the class notfound exception
+   * @throws ClassNotFoundException the class not found exception
    */
   public ConnectedUser(@NotNull Path file) throws IOException, ClassNotFoundException {
     super("", ""); //initialize after read file
@@ -177,8 +177,7 @@ public class ConnectedUser extends AbstractUser {
    */
   public void addIncomingMessageListener(BareJid contactJid, Consumer<String> updateChatDisplay) {
     if (chat != null) {
-      ChatListener chatListener = new ChatListener(contactJid, updateChatDisplay);
-      chat.addIncomingListener(chatListener);
+      chat.addIncomingListener(new ChatListener(contactJid, updateChatDisplay));
     }
   }
 }

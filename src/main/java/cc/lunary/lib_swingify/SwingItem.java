@@ -141,6 +141,7 @@ public record SwingItem<C extends Component>(C component) {
     }
 
     public Builder<C> size(Dimension dimension) {
+      this.component.setPreferredSize(dimension);
       this.component.setSize(dimension);
       return this;
     }
@@ -153,7 +154,7 @@ public record SwingItem<C extends Component>(C component) {
       Dimension dimension;
       try {
         dimension = Toolkit.getDefaultToolkit().getScreenSize();
-        dimension.setSize(Math.round(dimension.getWidth() * factor), dimension.getHeight() * factor);
+        dimension.setSize(dimension.getWidth() * factor, dimension.getHeight() * factor);
       } catch (final Throwable ignored) {
         dimension = new Dimension(320, 180);
       }
@@ -233,6 +234,16 @@ public record SwingItem<C extends Component>(C component) {
 
     public <O extends Component> Builder<C> add(@NotNull SwingItem<O> item) {
       return this.add((String) null, item);
+    }
+
+    public <O extends Component> Builder<C> add(
+        @NotNull SwingItem<O> item,
+        @NotNull String constraints
+    ) {
+      if (this.component instanceof Container container) {
+        container.add(item.component, constraints);
+      }
+      return this;
     }
 
     public <O extends Component> Builder<C> add(

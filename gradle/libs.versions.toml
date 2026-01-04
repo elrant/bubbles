@@ -18,8 +18,9 @@ mdns = "1.1.1"
 smack = "4.5.0-rc1"
 bcprov = "1.83"
 
-# misc
+# swing
 flatlaf = "3.7"
+miglayout = "11.4.2"
 
 [libraries]
 # annotations
@@ -50,9 +51,10 @@ smack-tcp     = { group = "org.igniterealtime.smack", name = "smack-tcp"        
 smack-ext     = { group = "org.igniterealtime.smack", name = "smack-extensions"      , version.ref = "smack"  }
 bcprov        = { group = "org.bouncycastle"        , name = "bcprov-jdk18on"        , version.ref = "bcprov" }
 
-# misc
-flatlaf        = { group = "com.formdev", name = "flatlaf"                , version.ref = "flatlaf" }
-flatlaf-themes = { group = "com.formdev", name = "flatlaf-intellij-themes", version.ref = "flatlaf" }
+# swing
+flatlaf        = { group = "com.formdev"  , name = "flatlaf"                , version.ref = "flatlaf"   }
+flatlaf-themes = { group = "com.formdev"  , name = "flatlaf-intellij-themes", version.ref = "flatlaf"   }
+miglayout      = { group = "com.miglayout", name = "miglayout-swing"        , version.ref = "miglayout" } 
 
 [bundles]
 annotations = [
@@ -90,7 +92,8 @@ xmpp = [
   "bcprov"
 ]
 
-themes = [
+swing = [
   "flatlaf",
-  "flatlaf-themes"
+  "flatlaf-themes",
+  "miglayout"
 ]
