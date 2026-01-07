@@ -4,6 +4,7 @@ import cc.lunary.swingify.Swingify;
 import cc.lunary.swingify.Themes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import team.elrant.bubbles.frames.LoginFrame;
 
 import javax.swing.*;
 
@@ -14,11 +15,11 @@ public final class Bubbles {
   public static Bubbles get() {
     return INSTANCE;
   }
-  
+
   public void run() {
     Swingify.init();
 
-    new Swingify<>(loginFrame, "Bubbles XMPP", Themes.GRADIANTO_DEEP_OCEAN, item -> {
+    new Swingify<>(LoginFrame.ITEM, "Bubbles XMPP", Themes.GRADIANTO_DEEP_OCEAN, item -> {
       if (JOptionPane.showConfirmDialog(
           item.component(),
           """
@@ -26,8 +27,8 @@ public final class Bubbles {
               """,
           "~ Bubbles",
           JOptionPane.YES_NO_OPTION,
-          JOptionPane.QUESTION_MESSAGE
-      ) != JOptionPane.YES_OPTION) return;
+          JOptionPane.QUESTION_MESSAGE) != JOptionPane.YES_OPTION)
+        return;
       System.exit(0);
     }).show();
   }
