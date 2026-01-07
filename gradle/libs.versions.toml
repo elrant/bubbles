@@ -44,6 +44,7 @@ jxmpp         = { group = "org.jxmpp"               , name = "jxmpp-core"       
 jxmpp-jid     = { group = "org.jxmpp"               , name = "jxmpp-jid"             , version.ref = "jxmpp"  }
 mdns          = { group = "org.minidns"             , name = "minidns-core"          , version.ref = "mdns"   }
 smack-xml     = { group = "org.igniterealtime.smack", name = "smack-xmlparser"       , version.ref = "smack"  }
+smack-minidns = { group = "org.igniterealtime.smack", name = "smack-resolver-minidns", version.ref = "smack"  }
 smack-xmlstax = { group = "org.igniterealtime.smack", name = "smack-xmlparser-stax"  , version.ref = "smack"  }
 smack-core    = { group = "org.igniterealtime.smack", name = "smack-core"            , version.ref = "smack"  }
 smack-stream  = { group = "org.igniterealtime.smack", name = "smack-streammanagement", version.ref = "smack"  }
@@ -87,6 +88,7 @@ xmpp = [
   "smack-xmlstax",
   "smack-core",
   "smack-stream",
+  "smack-minidns",
   "smack-tcp",
   "smack-ext",
   "bcprov"
