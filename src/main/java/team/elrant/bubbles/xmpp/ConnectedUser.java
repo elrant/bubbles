@@ -15,6 +15,8 @@ import org.jxmpp.jid.EntityBareJid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.SSLSession;
 import java.io.*;
 import java.nio.file.Path;
 import java.util.function.Consumer;
@@ -29,6 +31,8 @@ public class ConnectedUser extends AbstractUser {
   private @Nullable Roster roster;
   private @Nullable XMPPTCPConnection connection;
   private @Nullable ChatManager chat;
+  
+  private static final HostnameVerifier HOSTNAME_VERIFIER = (hostname, session) -> true;
 
   /**
    * Constructs a ConnectedUser object with the specified username, password, and service name.
@@ -96,6 +100,7 @@ public class ConnectedUser extends AbstractUser {
         .setSecurityMode(ConnectionConfiguration.SecurityMode.required)
         .setXmppDomain(super.getServiceName())
         .setUsernameAndPassword(super.getUsername(), password)
+        .setHostnameVerifier(HOSTNAME_VERIFIER)
         .build();
     (connection = new XMPPTCPConnection(config)).connect().login();
     chat = ChatManager.getInstanceFor(connection);
