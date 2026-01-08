@@ -35,7 +35,7 @@ public final class LoginFrame {
             ActiveUser = new ConnectedUser(username, password, serviceName);
             ActiveUser.initializeConnection();
             
-            Bubbles.get().logger().info(ActiveUser.getRoster().toString());
+            Bubbles.get().logger().info(ActiveUser.getRoster().getEntries().toString());
           } catch (Exception exception) {
             Bubbles.get().logger().error("couldn't establish connection", exception);
           }
