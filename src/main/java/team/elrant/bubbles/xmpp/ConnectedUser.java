@@ -10,14 +10,17 @@ import org.jivesoftware.smack.chat2.ChatManager;
 import org.jivesoftware.smack.roster.Roster;
 import org.jivesoftware.smack.tcp.XMPPTCPConnection;
 import org.jivesoftware.smack.tcp.XMPPTCPConnectionConfiguration;
+import org.jivesoftware.smack.util.stringencoder.Base64;
 import org.jxmpp.jid.BareJid;
 import org.jxmpp.jid.EntityBareJid;
+import org.jxmpp.jid.impl.JidCreate;
+import org.minidns.dnsname.DnsName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.HostnameVerifier;
-import javax.net.ssl.SSLSession;
 import java.io.*;
+import java.net.Inet4Address;
 import java.nio.file.Path;
 import java.util.function.Consumer;
 
@@ -27,12 +30,39 @@ import java.util.function.Consumer;
  */
 public class ConnectedUser extends AbstractUser {
   private static final Logger logger = LoggerFactory.getLogger(ConnectedUser.class);
+  private static final HostnameVerifier HOSTNAME_VERIFIER = (hostname, session) -> true;
+
+  static {
+    Base64.setEncoder(new Base64.Encoder() {
+      private static final java.util.Base64.Encoder ENCODER = java.util.Base64.getEncoder();
+      private static final java.util.Base64.Decoder DECODER = java.util.Base64.getDecoder();
+
+      @Override
+      public byte[] decode(String string) {
+        return DECODER.decode(string);
+      }
+
+      @Override
+      public String encodeToString(byte[] input) {
+        return ENCODER.encodeToString(input);
+      }
+
+      @Override
+      public String encodeToStringWithoutPadding(byte[] input) {
+        return ENCODER.encodeToString(input);
+      }
+
+      @Override
+      public byte[] encode(byte[] input) {
+        return ENCODER.encode(input);
+      }
+    });
+  }
+
   private final @NotNull String password;
   private @Nullable Roster roster;
   private @Nullable XMPPTCPConnection connection;
   private @Nullable ChatManager chat;
-  
-  private static final HostnameVerifier HOSTNAME_VERIFIER = (hostname, session) -> true;
 
   /**
    * Constructs a ConnectedUser object with the specified username, password, and service name.
@@ -96,13 +126,16 @@ public class ConnectedUser extends AbstractUser {
    * @throws IOException          If an I/O error occurs.
    */
   public void initializeConnection() throws SmackException, InterruptedException, XMPPException, IOException {
-    var config = XMPPTCPConnectionConfiguration.builder()
-        .setSecurityMode(ConnectionConfiguration.SecurityMode.required)
-        .setXmppDomain(super.getServiceName())
+    System.out.println(DnsName.from(super.getServiceName()));
+    (connection = new XMPPTCPConnection(XMPPTCPConnectionConfiguration.builder()
+        .setSecurityMode(ConnectionConfiguration.SecurityMode.ifpossible)
+        .setXmppDomain(JidCreate.domainBareFrom(super.getServiceName()))
         .setUsernameAndPassword(super.getUsername(), password)
+        .setResource("meow")
         .setHostnameVerifier(HOSTNAME_VERIFIER)
-        .build();
-    (connection = new XMPPTCPConnection(config)).connect().login();
+        // .setHost(DnsName.from(super.getServiceName()))
+        .setHostAddress(Inet4Address.getByName("54.37.228.230"))
+        .build())).connect().login();
     chat = ChatManager.getInstanceFor(connection);
     roster = Roster.getInstanceFor(connection);
     roster.reloadAndWait();

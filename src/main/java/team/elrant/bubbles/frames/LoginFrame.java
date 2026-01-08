@@ -12,8 +12,6 @@ public final class LoginFrame {
   public static SwingItem<JFrame> ITEM;
   public static ConnectedUser ActiveUser = null;
   static {
-    
-
     var builder = new SwingItem.Builder<>(JFrame::new)
         .layout(new GridLayout())
         .sizeDefault()
@@ -38,11 +36,16 @@ public final class LoginFrame {
             ActiveUser.initializeConnection();
             
             Bubbles.get().logger().info(ActiveUser.getRoster().toString());
-          } catch (Exception e) {
-            throw new RuntimeException(e);
+          } catch (Exception exception) {
+            Bubbles.get().logger().error("couldn't establish connection", exception);
           }
         }).build();
-    loginPanel.add(loginTxtBoxName).add(loginTxtBoxServiceName).add(loginTxtBoxPass).add(loginBtnProceed);
+
+    loginPanel
+        .add(loginTxtBoxName)
+        .add(loginTxtBoxServiceName)
+        .add(loginTxtBoxPass)
+        .add(loginBtnProceed);
 
     ITEM = builder.add(loginPanel.build()).build();
   }
