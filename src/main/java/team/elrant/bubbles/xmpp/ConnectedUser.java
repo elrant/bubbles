@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import javax.net.ssl.HostnameVerifier;
 import java.io.*;
 import java.net.Inet4Address;
+import java.net.InetAddress;
 import java.nio.file.Path;
 import java.util.function.Consumer;
 
@@ -133,8 +134,7 @@ public class ConnectedUser extends AbstractUser {
         .setUsernameAndPassword(super.getUsername(), password)
         .setResource("meow")
         .setHostnameVerifier(HOSTNAME_VERIFIER)
-        // .setHost(DnsName.from(super.getServiceName()))
-        .setHostAddress(Inet4Address.getByName("54.37.228.230"))
+        .setHostAddress(InetAddress.getByName(super.getServiceName())) // Smack used to do this on its own. I have no idea why it's up to us now.
         .build())).connect().login();
     chat = ChatManager.getInstanceFor(connection);
     roster = Roster.getInstanceFor(connection);
