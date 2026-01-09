@@ -6,11 +6,12 @@ import team.elrant.bubbles.Bubbles;
 import team.elrant.bubbles.xmpp.ConnectedUser;
 import javax.swing.*;
 import java.awt.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 
 public final class LoginFrame {
   public static SwingItem<JFrame> ITEM;
-  public static ConnectedUser ActiveUser = null;
+  
   static {
     var builder = new SwingItem.Builder<>(JFrame::new)
         .layout(new GridLayout())
@@ -19,11 +20,17 @@ public final class LoginFrame {
         .resizable(true);
 
     var loginPanel = new SwingItem.Builder<>(() -> new JPanel(new MigLayout()));
-    var loginTxtBoxName = new SwingItem.Builder<>(JTextField::new).size(160, 20).build();
-    var loginTxtBoxServiceName = new SwingItem.Builder<>(JTextField::new).size(160, 20).build();
-    var loginTxtBoxPass = new SwingItem.Builder<>(JPasswordField::new).size(160, 20).build();
-    var loginBtnProceed = new SwingItem.Builder<>(() -> new JButton("Login"))
+    AtomicBoolean loggingIn = new AtomicBoolean(false);
+    
+    SwingItem<JTextField>     loginTxtBoxName        = new SwingItem.Builder<>(JTextField::new).size(160, 20).build();
+    SwingItem<JTextField>     loginTxtBoxServiceName = new SwingItem.Builder<>(JTextField::new).size(160, 20).build();
+    SwingItem<JPasswordField> loginTxtBoxPass        = new SwingItem.Builder<>(JPasswordField::new).size(160, 20).build();
+    SwingItem<JButton>        loginBtnProceed        = new SwingItem.Builder<>(() -> new JButton("Login"))
         .mouse(SwingItem.Mouse.CLICK, event -> {
+          if (loggingIn.get()) {
+            return;
+          }
+          loggingIn.set(true);
           String username = loginTxtBoxName.component().getText();
           String serviceName = loginTxtBoxServiceName.component().getText();
           String password = new String(loginTxtBoxPass.component().getPassword());
@@ -32,15 +39,21 @@ public final class LoginFrame {
               username, serviceName, password
           );
           try {
-            ActiveUser = new ConnectedUser(username, password, serviceName);
-            ActiveUser.initializeConnection();
+            Bubbles.ActiveUser = new ConnectedUser(username, password, serviceName);
+            Bubbles.ActiveUser.initializeConnection();
             
-            Bubbles.get().logger().info(ActiveUser.getRoster().getEntries().toString());
+            Bubbles.get().logger().info(Bubbles.ActiveUser.getRoster().getEntries().toString());
+            
+            Bubbles.loginWindow.hide();
+            Bubbles.chatWindow.show();
+            loggingIn.set(false);
           } catch (Exception exception) {
+            loggingIn.set(false);
             Bubbles.get().logger().error("couldn't establish connection", exception);
+            
           }
         }).build();
-
+    
     loginPanel
         .add(loginTxtBoxName)
         .add(loginTxtBoxServiceName)
