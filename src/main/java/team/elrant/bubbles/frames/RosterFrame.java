@@ -22,7 +22,12 @@ public class RosterFrame {
 
     Bubbles.get().events().register(LoggedInEvent.class, event -> {
       for (var entry : event.user().getRoster().getEntries()) {
-        rosterPanel.add(new SwingItem.Builder<>(() -> new JButton(entry.getName())).build());
+        if (entry.getName() != null) {
+          rosterPanel.add(new SwingItem.Builder<>(() -> new JButton(entry.getName())).build());
+        } else {
+          rosterPanel.add(new SwingItem.Builder<>(() -> new JButton(entry.getJid().toString())).build());
+        }
+        
       }
     });
 
