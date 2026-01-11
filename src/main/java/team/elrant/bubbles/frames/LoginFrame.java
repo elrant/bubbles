@@ -49,17 +49,20 @@ public final class LoginFrame {
 
           Thread.ofVirtual().start(() -> {
             try {
-              Bubbles.ActiveUser = new ConnectedUser(username, password, serviceName);
-              Bubbles.ActiveUser.initializeConnection();
+              Bubbles.activeUser = new ConnectedUser(username, password, serviceName);
+              Bubbles.activeUser.initializeConnection();
 
-              Bubbles.get().logger().info("Connection successful! Roster entries: {}", Bubbles.ActiveUser.getRoster().getEntries().toString());
+              Bubbles.roster = Bubbles.activeUser.getRoster();
+
+              Bubbles.get().logger().info("Connection successful! Roster entries: {}", Bubbles.roster.getEntries().toString());
 
               Bubbles.loginWindow.hide();
               Bubbles.chatWindow.show();
+              Bubbles.rosterWindow.show();
               loggingIn.set(false);
             } catch (Exception exception) {
               loggingIn.set(false);
-              Bubbles.get().logger().error("couldn't establish connection", exception);
+              Bubbles.get().logger().error("Couldn't establish connection: ", exception);
             }
           });
         }).build();

@@ -1,13 +1,14 @@
 package team.elrant.bubbles;
 
-import cc.lunary.swingify.SwingItem;
 import cc.lunary.swingify.Swingify;
 import cc.lunary.swingify.Themes;
 import org.jetbrains.annotations.Nullable;
+import org.jivesoftware.smack.roster.Roster;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import team.elrant.bubbles.frames.ChatFrame;
 import team.elrant.bubbles.frames.LoginFrame;
+import team.elrant.bubbles.frames.RosterFrame;
 import team.elrant.bubbles.xmpp.ConnectedUser;
 
 import javax.swing.*;
@@ -19,9 +20,12 @@ public final class Bubbles {
 
   public static Swingify<JFrame> loginWindow;
   public static Swingify<JFrame> chatWindow;
-
+  public static Swingify<JFrame> rosterWindow;
   @Nullable
-  public static ConnectedUser ActiveUser = null;
+  public static ConnectedUser activeUser = null;
+  
+  @Nullable
+  public static Roster roster = null;
   
   public static Bubbles get() {
     return INSTANCE;
@@ -55,7 +59,20 @@ public final class Bubbles {
         return;
       System.exit(0);
     });
-    
+
+    rosterWindow = new Swingify<>(RosterFrame.ITEM, "Bubbles - Roster", Themes.GRADIANTO_DEEP_OCEAN, item -> {
+      if (JOptionPane.showConfirmDialog(
+          item.component(),
+          """
+              Are you sure you want to close this window?
+              """,
+          "Bubbles",
+          JOptionPane.YES_NO_OPTION,
+          JOptionPane.QUESTION_MESSAGE) != JOptionPane.YES_OPTION)
+        return;
+      System.exit(0);
+    });
+
     loginWindow.show();
   }
   
