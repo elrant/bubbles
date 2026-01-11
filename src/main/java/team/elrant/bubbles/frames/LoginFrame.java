@@ -51,6 +51,7 @@ public final class LoginFrame {
           Thread.ofVirtual().start(() -> {
             try {
               var user = new ConnectedUser(username, password, serviceName);
+              user.initializeConnection();
 
               Bubbles.get().logger().info(
                   "Roster entries: {}",
