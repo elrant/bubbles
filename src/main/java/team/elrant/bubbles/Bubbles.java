@@ -29,20 +29,20 @@ public final class Bubbles {
   public void run() {
     Swingify.init();
     
-      loginWindow = new Swingify<>(LoginFrame.ITEM, "Bubbles XMPP ~ Login", Themes.GRADIANTO_DEEP_OCEAN, item -> {
+      loginWindow = new Swingify<>(LoginFrame.ITEM, "Bubbles XMPP - Login", Themes.GRADIANTO_DEEP_OCEAN, item -> {
       if (JOptionPane.showConfirmDialog(
           item.component(),
           """
               Are you sure you want to close this window?
               """,
-          "Bubbles | Login",
+          "Bubbles - Login",
           JOptionPane.YES_NO_OPTION,
           JOptionPane.QUESTION_MESSAGE) != JOptionPane.YES_OPTION)
         return;
       System.exit(0);
     });
     
-    chatWindow = new Swingify<>(ChatFrame.ITEM, "Bubbles XMPP ~ Chat", Themes.GRADIANTO_DEEP_OCEAN, item -> {
+    chatWindow = new Swingify<>(ChatFrame.ITEM, "Bubbles - Chat", Themes.GRADIANTO_DEEP_OCEAN, item -> {
       if (JOptionPane.showConfirmDialog(
           item.component(),
           """

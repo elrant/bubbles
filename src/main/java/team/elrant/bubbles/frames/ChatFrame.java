@@ -3,8 +3,6 @@ package team.elrant.bubbles.frames;
 
 import cc.lunary.swingify.SwingItem;
 import net.miginfocom.swing.MigLayout;
-import team.elrant.bubbles.Bubbles;
-import team.elrant.bubbles.xmpp.ConnectedUser;
 
 import javax.swing.*;
 import java.awt.*;
