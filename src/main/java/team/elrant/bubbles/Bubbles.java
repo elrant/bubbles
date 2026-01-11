@@ -2,39 +2,34 @@ package team.elrant.bubbles;
 
 import cc.lunary.swingify.Swingify;
 import cc.lunary.swingify.Themes;
-import org.jetbrains.annotations.Nullable;
-import org.jivesoftware.smack.roster.Roster;
+import cc.lunary.tinyevents.TinyEvents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import team.elrant.bubbles.frames.ChatFrame;
 import team.elrant.bubbles.frames.LoginFrame;
 import team.elrant.bubbles.frames.RosterFrame;
-import team.elrant.bubbles.xmpp.ConnectedUser;
 
 import javax.swing.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class Bubbles {
   private static final Bubbles INSTANCE = new Bubbles();
-  
-  private final Logger logger = LoggerFactory.getLogger(Bubbles.class);
 
   public static Swingify<JFrame> loginWindow;
   public static Swingify<JFrame> chatWindow;
   public static Swingify<JFrame> rosterWindow;
-  @Nullable
-  public static ConnectedUser activeUser = null;
-  
-  @Nullable
-  public static Roster roster = null;
-  
+
+  private final Logger logger = LoggerFactory.getLogger(Bubbles.class);
+  private final TinyEvents events = new TinyEvents(ConcurrentHashMap::new);
+
   public static Bubbles get() {
     return INSTANCE;
   }
 
   public void run() {
     Swingify.init();
-    
-      loginWindow = new Swingify<>(LoginFrame.ITEM, "Bubbles XMPP - Login", Themes.GRADIANTO_DEEP_OCEAN, item -> {
+
+    loginWindow = new Swingify<>(LoginFrame.ITEM, "Bubbles XMPP - Login", Themes.GRADIANTO_DEEP_OCEAN, item -> {
       if (JOptionPane.showConfirmDialog(
           item.component(),
           """
@@ -46,7 +41,7 @@ public final class Bubbles {
         return;
       System.exit(0);
     });
-    
+
     chatWindow = new Swingify<>(ChatFrame.ITEM, "Bubbles - Chat", Themes.GRADIANTO_DEEP_OCEAN, item -> {
       if (JOptionPane.showConfirmDialog(
           item.component(),
@@ -75,8 +70,12 @@ public final class Bubbles {
 
     loginWindow.show();
   }
-  
+
   public Logger logger() {
     return this.logger;
+  }
+
+  public TinyEvents events() {
+    return this.events;
   }
 }

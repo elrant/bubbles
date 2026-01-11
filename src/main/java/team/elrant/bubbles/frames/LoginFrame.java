@@ -3,6 +3,7 @@ package team.elrant.bubbles.frames;
 import cc.lunary.swingify.SwingItem;
 import net.miginfocom.swing.MigLayout;
 import team.elrant.bubbles.Bubbles;
+import team.elrant.bubbles.event.LoggedInEvent;
 import team.elrant.bubbles.xmpp.ConnectedUser;
 
 import javax.swing.*;
@@ -35,13 +36,13 @@ public final class LoginFrame {
           String username = loginTxtBoxName.component().getText();
           String serviceName = loginTxtBoxServiceName.component().getText();
           String password = new String(loginTxtBoxPass.component().getPassword());
-          
-          if (username.isEmpty() || password.isEmpty() ||  serviceName.isEmpty()) {
+
+          if (username.isEmpty() || password.isEmpty() || serviceName.isEmpty()) {
             JOptionPane.showMessageDialog(loginPanel.component(), "Fields are empty!", "Bubbles - Login error", JOptionPane.ERROR_MESSAGE);
             loggingIn.set(false);
             return;
           }
-          
+
           Bubbles.get().logger().info(
               "Attempting login for: {}@{} {}",
               username, serviceName, password
@@ -49,20 +50,22 @@ public final class LoginFrame {
 
           Thread.ofVirtual().start(() -> {
             try {
-              Bubbles.activeUser = new ConnectedUser(username, password, serviceName);
-              Bubbles.activeUser.initializeConnection();
+              var user = new ConnectedUser(username, password, serviceName);
 
-              Bubbles.roster = Bubbles.activeUser.getRoster();
-
-              Bubbles.get().logger().info("Connection successful! Roster entries: {}", Bubbles.roster.getEntries().toString());
+              Bubbles.get().logger().info(
+                  "Roster entries: {}",
+                  user.getRoster().getEntries().toString()
+              );
 
               Bubbles.loginWindow.hide();
               Bubbles.chatWindow.show();
               Bubbles.rosterWindow.show();
               loggingIn.set(false);
+
+              Bubbles.get().events().call(new LoggedInEvent(user));
             } catch (Exception exception) {
               loggingIn.set(false);
-              Bubbles.get().logger().error("Couldn't establish connection: ", exception);
+              Bubbles.get().logger().error("couldn't establish connection", exception);
             }
           });
         }).build();

@@ -17,6 +17,7 @@ import org.jxmpp.jid.impl.JidCreate;
 import org.minidns.dnsname.DnsName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import team.elrant.bubbles.Bubbles;
 
 import javax.net.ssl.HostnameVerifier;
 import java.io.*;
@@ -127,15 +128,17 @@ public class ConnectedUser extends AbstractUser {
    * @throws IOException          If an I/O error occurs.
    */
   public void initializeConnection() throws SmackException, InterruptedException, XMPPException, IOException {
-    System.out.println(DnsName.from(super.getServiceName()));
+    Bubbles.get().logger().info("logging in {}...", super.getServiceName());
     (connection = new XMPPTCPConnection(XMPPTCPConnectionConfiguration.builder()
         .setSecurityMode(ConnectionConfiguration.SecurityMode.ifpossible)
         .setXmppDomain(JidCreate.domainBareFrom(super.getServiceName()))
+        .setHostAddress(InetAddress.getByName(super.getServiceName()))
         .setUsernameAndPassword(super.getUsername(), password)
-        .setResource("meow")
         .setHostnameVerifier(HOSTNAME_VERIFIER)
-        .setHostAddress(InetAddress.getByName(super.getServiceName())) // Smack used to do this on its own. I have no idea why it's up to us now.
+        .setResource("meow")
         .build())).connect().login();
+    Bubbles.get().logger().info("...welcome, {}!", super.getUsername());
+    
     chat = ChatManager.getInstanceFor(connection);
     roster = Roster.getInstanceFor(connection);
     roster.reloadAndWait();
