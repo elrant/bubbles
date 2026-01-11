@@ -1,5 +1,6 @@
 package team.elrant.bubbles;
 
+import cc.lunary.swingify.SwingItem;
 import cc.lunary.swingify.Swingify;
 import cc.lunary.swingify.Themes;
 import org.jetbrains.annotations.Nullable;
@@ -53,7 +54,7 @@ public final class Bubbles {
           JOptionPane.QUESTION_MESSAGE) != JOptionPane.YES_OPTION)
         return;
       System.exit(0);
-    }); 
+    });
     
     loginWindow.show();
   }
