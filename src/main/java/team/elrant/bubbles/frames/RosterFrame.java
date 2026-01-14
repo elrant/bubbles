@@ -37,9 +37,8 @@ public class RosterFrame {
           );
         }
       }
-
-      ITEM = builder.add(rosterPanel.build()).build();
     });
 
+    ITEM = builder.add(rosterPanel.build()).build();
   }
 }
