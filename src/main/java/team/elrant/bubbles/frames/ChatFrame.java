@@ -25,5 +25,6 @@ public final class ChatFrame {
   }
 
   private ChatFrame() {
+    
   }
 }
