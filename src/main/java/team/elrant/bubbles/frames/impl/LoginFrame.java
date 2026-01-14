@@ -56,7 +56,7 @@ public final class LoginFrame extends AbstractFrame {
           username, serviceName, password
       );
 
-      Thread.ofVirtual().start(() -> {
+      Thread.ofVirtual().name("Login").start(() -> {
         try {
           var user = new ConnectedUser(bubbles, username, password, serviceName);
           user.initializeConnection();
