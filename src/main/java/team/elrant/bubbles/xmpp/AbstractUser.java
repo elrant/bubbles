@@ -3,6 +3,7 @@ package team.elrant.bubbles.xmpp;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import team.elrant.bubbles.Bubbles;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -15,7 +16,7 @@ import java.io.Serializable;
  */
 public class AbstractUser implements Serializable {
   private static final Logger logger = LoggerFactory.getLogger(AbstractUser.class);
-
+  final @NotNull Bubbles bubbles;
   public @NotNull String username;
   public @NotNull String serviceName;
 
@@ -26,9 +27,11 @@ public class AbstractUser implements Serializable {
    * @param serviceName The service name of the XMPP server.
    */
   public AbstractUser(
+      @NotNull Bubbles bubbles,
       @NotNull String username,
       @NotNull String serviceName
   ) {
+    this.bubbles = bubbles;
     this.username = username;
     this.serviceName = serviceName;
   }
@@ -40,7 +43,8 @@ public class AbstractUser implements Serializable {
    * @throws IOException            If an I/O error occurs while reading the file.
    * @throws ClassNotFoundException If the class of a serialized object cannot be found.
    */
-  public AbstractUser(@NotNull String filename) throws IOException, ClassNotFoundException {
+  public AbstractUser(@NotNull Bubbles bubbles, @NotNull String filename) throws IOException, ClassNotFoundException {
+    this.bubbles = bubbles;
     try (var obj = new ObjectInputStream(new FileInputStream(filename))) {
       var user = (AbstractUser) obj.readObject();
       this.username = user.getUsername();

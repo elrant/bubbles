@@ -14,14 +14,12 @@ import org.jivesoftware.smack.util.stringencoder.Base64;
 import org.jxmpp.jid.BareJid;
 import org.jxmpp.jid.EntityBareJid;
 import org.jxmpp.jid.impl.JidCreate;
-import org.minidns.dnsname.DnsName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import team.elrant.bubbles.Bubbles;
 
 import javax.net.ssl.HostnameVerifier;
 import java.io.*;
-import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.nio.file.Path;
 import java.util.function.Consumer;
@@ -74,14 +72,14 @@ public class ConnectedUser extends AbstractUser {
    * @param serviceName The service name of the XMPP server.
    */
   public ConnectedUser(
+      @NotNull Bubbles bubbles,
       @NotNull String username,
       @NotNull String password,
       @NotNull String serviceName
   ) {
-    super(username, serviceName);
+    super(bubbles, username, serviceName);
     this.password = password;
   }
-
 
   /**
    * Load a new Connected user from a file.
@@ -90,8 +88,8 @@ public class ConnectedUser extends AbstractUser {
    * @throws IOException            the io exception
    * @throws ClassNotFoundException the class not found exception
    */
-  public ConnectedUser(@NotNull Path file) throws IOException, ClassNotFoundException {
-    super("", ""); //initialize after read file
+  public ConnectedUser(final Bubbles bubbles, @NotNull Path file) throws IOException, ClassNotFoundException {
+    super(bubbles, "", ""); //initialize after read file
     try (var obj = new ObjectInputStream(new FileInputStream(file.toFile()))) {
       var user = (ConnectedUser) obj.readObject();
       super.username = user.getUsername();
@@ -128,7 +126,7 @@ public class ConnectedUser extends AbstractUser {
    * @throws IOException          If an I/O error occurs.
    */
   public void initializeConnection() throws SmackException, InterruptedException, XMPPException, IOException {
-    Bubbles.get().logger().info("logging in {}...", super.getServiceName());
+    super.bubbles.logger().info("logging in {}...", super.getServiceName());
     (connection = new XMPPTCPConnection(XMPPTCPConnectionConfiguration.builder()
         .setSecurityMode(ConnectionConfiguration.SecurityMode.ifpossible)
         .setXmppDomain(JidCreate.domainBareFrom(super.getServiceName()))
@@ -137,8 +135,8 @@ public class ConnectedUser extends AbstractUser {
         .setHostnameVerifier(HOSTNAME_VERIFIER)
         .setResource("meow")
         .build())).connect().login();
-    Bubbles.get().logger().info("...welcome, {}!", super.getUsername());
-    
+    super.bubbles.logger().info("...welcome, {}!", super.getUsername());
+
     chat = ChatManager.getInstanceFor(connection);
     roster = Roster.getInstanceFor(connection);
     roster.reloadAndWait();
@@ -176,9 +174,9 @@ public class ConnectedUser extends AbstractUser {
     try (@NotNull FileOutputStream fileOut = new FileOutputStream(filename); @NotNull ObjectOutputStream objectOut = new ObjectOutputStream(fileOut)) {
 
       if (savePassword)
-        objectOut.writeObject(new ConnectedUser(this.getUsername(), this.getPassword(), this.getServiceName()));
+        objectOut.writeObject(new ConnectedUser(super.bubbles, this.getUsername(), this.getPassword(), this.getServiceName()));
       else {
-        ConnectedUser user = new ConnectedUser(this.getUsername(), "uninit", this.getServiceName());
+        ConnectedUser user = new ConnectedUser(super.bubbles, this.getUsername(), "uninit", this.getServiceName());
         objectOut.writeObject(user);
       }
 
