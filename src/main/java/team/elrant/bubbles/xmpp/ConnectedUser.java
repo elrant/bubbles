@@ -1,7 +1,7 @@
 package team.elrant.bubbles.xmpp;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jivesoftware.smack.ConnectionConfiguration;
@@ -167,12 +167,8 @@ public class ConnectedUser extends AbstractUser {
    */
   public void saveUserToFile(@NotNull String filename, boolean savePassword) {
     var data = new UserData(getUsername(), getServiceName(), savePassword ? password : null);
-    try {
-      MAPPER.writerWithDefaultPrettyPrinter().writeValue(new File(filename), data);
-      logger.info("User information saved to {}", filename);
-    } catch (IOException e) {
-      logger.error("Error saving user information to file: {}", e.getMessage());
-    }
+    MAPPER.writerWithDefaultPrettyPrinter().writeValue(new File(filename), data);
+    logger.info("User information saved to {}", filename);
   }
 
   /**

@@ -3,10 +3,10 @@
 jetbrains-annotations = "26.0.2-1"
 
 # serialization
-jackson             = "2.19.4"
-jackson-annotations = "2.19.4"
-jackson-bom         = "2.19.4"
-jackson-parent      = "2.19"
+jackson             = "3.2.0"
+jackson-annotations = "2.22"
+jackson-bom         = "3.2.0"
+jackson-parent      = "2.22"
 
 # logging
 slf4j   = "2.0.17"
@@ -16,22 +16,22 @@ tinylog = "2.8.0-M1"
 jxmpp = "1.1.0"
 mdns = "1.1.1"
 smack = "4.5.0-rc1"
-bcprov = "1.83"
+bcprov = "1.84"
 
 # swing
-flatlaf = "3.7"
-miglayout = "11.4.2"
+flatlaf = "3.7.1"
+miglayout = "11.4.3"
 
 [libraries]
 # annotations
 annotations         = { group = "org.jetbrains"             , name = "annotations"        , version.ref = "jetbrains-annotations" }
 jackson-annotations = { group = "com.fasterxml.jackson.core", name = "jackson-annotations", version.ref = "jackson-annotations"   }
-jackson-bom         = { group = "com.fasterxml.jackson"     , name = "jackson-bom"        , version.ref = "jackson-bom"           }
+jackson-bom         = { group = "tools.jackson"             , name = "jackson-bom"        , version.ref = "jackson-bom"           }
 jackson-parent      = { group = "com.fasterxml.jackson"     , name = "jackson-parent"     , version.ref = "jackson-parent"        }
 
 # serialization
-jackson-core        = { group = "com.fasterxml.jackson.core", name = "jackson-core"    , version.ref = "jackson" }
-jackson-databind    = { group = "com.fasterxml.jackson.core", name = "jackson-databind", version.ref = "jackson" }
+jackson-core        = { group = "tools.jackson.core", name = "jackson-core"    , version.ref = "jackson" }
+jackson-databind    = { group = "tools.jackson.core", name = "jackson-databind", version.ref = "jackson" }
 
 # logging
 slf4j-api     = { group = "org.slf4j"  , name = "slf4j-api"    , version.ref = "slf4j"   }
