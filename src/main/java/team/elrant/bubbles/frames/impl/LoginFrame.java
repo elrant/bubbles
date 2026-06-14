@@ -12,19 +12,21 @@ import team.elrant.bubbles.xmpp.ConnectedUser;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.ActionListener;
 
 
 public final class LoginFrame extends AbstractFrame {
   private final SwingItem<JFrame> item;
 
   public LoginFrame(final Bubbles bubbles) {
+    super(bubbles);
     var builder = new SwingItem.Builder<>(JFrame::new)
         .layout(new GridLayout())
         .sizeDefault()
         .locationDefault()
         .resizable(true);
 
-    var loginPanel = new SwingItem.Builder<>(() -> new JPanel(new MigLayout()));
+    var loginPanel = new SwingItem.Builder<>(() -> new JPanel(new MigLayout("wrap 2", "[right]rel[grow,fill]")));
 
     var loginTxtBoxName = new SwingItem.Builder<>(JTextField::new)
         .size(160, 20)
@@ -36,7 +38,7 @@ public final class LoginFrame extends AbstractFrame {
         .size(160, 20)
         .build();
 
-    var loginBtnProceed = new SwingItem.Builder<>(() -> new JButton("Login")).mouse(SwingItem.Mouse.CLICK, event -> {
+    ActionListener doLogin = event -> {
       String username = loginTxtBoxName.component().getText();
       String serviceName = loginTxtBoxServiceName.component().getText();
       String password = new String(loginTxtBoxPass.component().getPassword());
@@ -44,17 +46,14 @@ public final class LoginFrame extends AbstractFrame {
       if (username.isEmpty() || password.isEmpty() || serviceName.isEmpty()) {
         JOptionPane.showMessageDialog(
             loginPanel.component(),
-            "Fields are empty!",
+            "All fields are required.",
             "Bubbles - Login error",
             JOptionPane.ERROR_MESSAGE
         );
         return;
       }
 
-      bubbles.logger().info(
-          "Attempting login for: {}@{} {}",
-          username, serviceName, password
-      );
+      bubbles.logger().info("Attempting login for: {}@{}", username, serviceName);
 
       Thread.ofVirtual().name("Login").start(() -> {
         try {
@@ -74,14 +73,36 @@ public final class LoginFrame extends AbstractFrame {
           bubbles.events().call(new LoggedInEvent(user));
         } catch (Exception exception) {
           bubbles.logger().error("couldn't establish connection", exception);
+          SwingUtilities.invokeLater(() ->
+              JOptionPane.showMessageDialog(
+                  loginPanel.component(),
+                  "Could not connect: " + exception.getMessage(),
+                  "Bubbles - Login error",
+                  JOptionPane.ERROR_MESSAGE
+              )
+          );
         }
       });
+    };
+
+    loginTxtBoxName.component().addActionListener(doLogin);
+    loginTxtBoxServiceName.component().addActionListener(doLogin);
+    loginTxtBoxPass.component().addActionListener(doLogin);
+
+    var loginBtnProceed = new SwingItem.Builder<>(() -> {
+      var btn = new JButton("Login");
+      btn.addActionListener(doLogin);
+      return btn;
     }).build();
 
     loginPanel
+        .add(new SwingItem.Builder<>(() -> new JLabel("Username:")).build())
         .add(loginTxtBoxName)
+        .add(new SwingItem.Builder<>(() -> new JLabel("Server:")).build())
         .add(loginTxtBoxServiceName)
+        .add(new SwingItem.Builder<>(() -> new JLabel("Password:")).build())
         .add(loginTxtBoxPass)
+        .add(new SwingItem.Builder<>(() -> new JLabel("")).build())
         .add(loginBtnProceed);
 
     this.item = builder.add(loginPanel.build()).build();
@@ -97,14 +118,13 @@ public final class LoginFrame extends AbstractFrame {
     return new Swingify<>(this.item, "Bubbles XMPP - Login", Themes.GRADIANTO_DEEP_OCEAN, item -> {
       if (JOptionPane.showConfirmDialog(
           item.component(),
-          """
-              Are you sure you want to close this window?
-              """,
+          "Are you sure you want to close this window?",
           "Bubbles - Login",
           JOptionPane.YES_NO_OPTION,
           JOptionPane.QUESTION_MESSAGE
       ) != JOptionPane.YES_OPTION) return;
-      System.exit(0);
+      item.component().dispose();
+      bubbles.shutdown();
     });
   }
 }

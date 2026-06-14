@@ -16,6 +16,11 @@ public final class Bubbles {
     this.frames.login().window().show();
   }
 
+  public void shutdown() {
+    logger.info("Shutting down Bubbles...");
+    System.exit(0);
+  }
+
   public Logger logger() {
     return this.logger;
   }

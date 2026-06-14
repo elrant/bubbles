@@ -15,6 +15,7 @@ public final class SettingsFrame extends AbstractFrame {
   private final SwingItem<JFrame> item;
 
   public SettingsFrame(final Bubbles bubbles) {
+    super(bubbles);
     var builder = new SwingItem.Builder<>(JFrame::new)
         .layout(new GridLayout())
         .sizeDefault()
@@ -44,7 +45,8 @@ public final class SettingsFrame extends AbstractFrame {
           JOptionPane.YES_NO_OPTION,
           JOptionPane.QUESTION_MESSAGE) != JOptionPane.YES_OPTION)
         return;
-      System.exit(0);
+      item.component().dispose();
+      bubbles.shutdown();
     });
   }
 }

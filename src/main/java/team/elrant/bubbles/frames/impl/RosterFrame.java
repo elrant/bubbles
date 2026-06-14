@@ -18,6 +18,7 @@ public final class RosterFrame extends AbstractFrame {
   private final SwingItem<JFrame> item;
 
   public RosterFrame(final Bubbles bubbles) {
+    super(bubbles);
     var builder = new SwingItem.Builder<>(JFrame::new)
         .layout(new GridLayout())
         .sizeDefault()
@@ -27,10 +28,17 @@ public final class RosterFrame extends AbstractFrame {
     var panel = new SwingItem.Builder<>(() -> new JPanel(new MigLayout()));
 
     bubbles.events().register(LoggedInEvent.class, event -> {
-      event.user().getRoster().getEntries().forEach(entry -> {
-      });
       for (var entry : event.user().getRoster().getEntries()) {
-        panel.add(new SwingItem.Builder<>(() -> new JButton(label(entry))).build());
+        var jid = entry.getJid();
+        panel.add(new SwingItem.Builder<>(() -> {
+          var btn = new JButton(label(entry));
+          btn.addActionListener(e -> {
+            var chatFrame = bubbles.frames().chat();
+            chatFrame.openChat(event.user(), jid);
+            chatFrame.window().show();
+          });
+          return btn;
+        }).build());
       }
     });
 
@@ -61,7 +69,8 @@ public final class RosterFrame extends AbstractFrame {
           JOptionPane.YES_NO_OPTION,
           JOptionPane.QUESTION_MESSAGE) != JOptionPane.YES_OPTION)
         return;
-      System.exit(0);
+      item.component().dispose();
+      bubbles.shutdown();
     });
   }
 }

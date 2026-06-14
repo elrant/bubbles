@@ -15,8 +15,6 @@ repositories {
 
 dependencies {
   annotationProcessor(libs.bundles.annotations); implementation(libs.bundles.annotations);
-  annotationProcessor(libs.annotations.get())
-  implementation(libs.annotations.get())
 
   arrayOf(
     libs.bundles.serialization,
