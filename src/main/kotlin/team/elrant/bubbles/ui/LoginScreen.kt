@@ -47,7 +47,7 @@ fun LoginScreen(bubbles: Bubbles) {
         bubbles.login(username, password, serviceName)
       } catch (e: Exception) {
         bubbles.logger.error("couldn't establish connection", e)
-        error = "Could not connect: ${e.message}"
+        error = "Could not connect: ${e.message ?: e::class.simpleName}"
       } finally {
         busy = false
       }

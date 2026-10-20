@@ -8,9 +8,9 @@ import org.jivesoftware.smack.tcp.XMPPTCPConnection
 import org.jivesoftware.smack.tcp.XMPPTCPConnectionConfiguration
 import org.jivesoftware.smack.util.stringencoder.Base64
 import org.jxmpp.jid.BareJid
-import org.jxmpp.jid.EntityBareJid
 import org.jxmpp.jid.impl.JidCreate
 import org.slf4j.LoggerFactory
+import tools.jackson.core.JacksonException
 import tools.jackson.databind.ObjectMapper
 import java.io.File
 import java.io.IOException
@@ -78,7 +78,12 @@ class ConnectedUser(
   /** Sends [message] to [contact] (user@service.name). Blocking. */
   fun sendMessage(contact: BareJid, message: String) {
     try {
-      chat?.chatWith(contact as EntityBareJid)?.send(message)
+      val entity = contact.asEntityBareJidIfPossible()
+      if (entity == null) {
+        logger.error("Cannot chat with {}: not a user JID", contact)
+        return
+      }
+      chat?.chatWith(entity)?.send(message)
     } catch (e: Exception) {
       logger.error("Error sending XMPP message: {}", e.message)
     }
@@ -92,8 +97,8 @@ class ConnectedUser(
   }
 
   private data class UserData(
-    @param:JsonProperty("username") val username: String,
-    @param:JsonProperty("serviceName") val serviceName: String,
+    @param:JsonProperty("username") val username: String?,
+    @param:JsonProperty("serviceName") val serviceName: String?,
     @param:JsonProperty("password") val password: String?,
   )
 
@@ -116,9 +121,15 @@ class ConnectedUser(
     /** Loads a [ConnectedUser] from a JSON file previously written by [saveUserToFile]. */
     @Throws(IOException::class)
     fun fromFile(file: Path): ConnectedUser {
-      val data = MAPPER.readValue(file.toFile(), UserData::class.java)
+      val data = try {
+        MAPPER.readValue(file.toFile(), UserData::class.java)
+      } catch (e: JacksonException) {
+        throw IOException("Could not parse user file $file", e)
+      }
+      val username = data.username ?: throw IOException("User file $file has no username")
+      val serviceName = data.serviceName ?: throw IOException("User file $file has no serviceName")
       logger.info("User information loaded from {}", file)
-      return ConnectedUser(data.username, data.password, data.serviceName)
+      return ConnectedUser(username, data.password, serviceName)
     }
 
     /** Verifies [hostname] against the peer certificate's SAN/CN without relying on the SSLSession peer host. */

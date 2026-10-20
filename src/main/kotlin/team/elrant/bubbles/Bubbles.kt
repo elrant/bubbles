@@ -23,7 +23,7 @@ data class RosterContact(val jid: BareJid, val name: String?) {
 
 /** Application state; everything the UI renders is observable from here. */
 class Bubbles {
-  val logger = LoggerFactory.getLogger(Bubbles::class.java)!!
+  val logger = LoggerFactory.getLogger(Bubbles::class.java)
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
   var user by mutableStateOf<ConnectedUser?>(null)
@@ -36,7 +36,8 @@ class Bubbles {
 
   private fun mutableHistory(contact: BareJid) = histories.getOrPut(contact) { mutableStateListOf() }
 
-  fun history(contact: BareJid): List<ChatMessage> = mutableHistory(contact)
+  /** Read-only view; does not create an entry, so it is safe to call during composition. */
+  fun history(contact: BareJid): List<ChatMessage> = histories[contact].orEmpty()
 
   /** Connects and logs in; throws on failure. Switches the UI to the roster on success. */
   suspend fun login(username: String, password: String, serviceName: String) {
