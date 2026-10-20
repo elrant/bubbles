@@ -18,9 +18,10 @@ mdns = "1.1.1"
 smack = "4.5.0-rc1"
 bcprov = "1.84"
 
-# swing
-flatlaf = "3.7.1"
-miglayout = "11.4.3"
+# kotlin / compose
+kotlin = "2.3.0"
+compose = "1.10.0"
+coroutines = "1.10.2"
 
 [libraries]
 # annotations
@@ -52,10 +53,13 @@ smack-tcp     = { group = "org.igniterealtime.smack", name = "smack-tcp"        
 smack-ext     = { group = "org.igniterealtime.smack", name = "smack-extensions"      , version.ref = "smack"  }
 bcprov        = { group = "org.bouncycastle"        , name = "bcprov-jdk18on"        , version.ref = "bcprov" }
 
-# swing
-flatlaf        = { group = "com.formdev"  , name = "flatlaf"                , version.ref = "flatlaf"   }
-flatlaf-themes = { group = "com.formdev"  , name = "flatlaf-intellij-themes", version.ref = "flatlaf"   }
-miglayout      = { group = "com.miglayout", name = "miglayout-swing"        , version.ref = "miglayout" } 
+# coroutines
+coroutines-swing = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-swing", version.ref = "coroutines" }
+
+[plugins]
+kotlin-jvm     = { id = "org.jetbrains.kotlin.jvm"            , version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose" , version.ref = "kotlin" }
+compose        = { id = "org.jetbrains.compose"               , version.ref = "compose" }
 
 [bundles]
 annotations = [
@@ -94,8 +98,6 @@ xmpp = [
   "bcprov"
 ]
 
-swing = [
-  "flatlaf",
-  "flatlaf-themes",
-  "miglayout"
+coroutines = [
+  "coroutines-swing"
 ]
