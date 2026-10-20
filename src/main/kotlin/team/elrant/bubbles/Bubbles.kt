@@ -21,7 +21,6 @@ import team.elrant.bubbles.model.Contact
 import team.elrant.bubbles.model.Status
 import team.elrant.bubbles.store.AccountStore
 import team.elrant.bubbles.xmpp.ConnectedUser
-import kotlin.system.exitProcess
 
 /** Application state; everything the UI renders is observable from here. */
 class Bubbles(private val accounts: AccountStore = AccountStore()) {
@@ -141,9 +140,9 @@ class Bubbles(private val accounts: AccountStore = AccountStore()) {
 
   private fun mutableHistory(contact: BareJid) = histories.getOrPut(contact) { mutableStateListOf() }
 
-  fun shutdown(): Nothing {
+  /** Disconnects for good. Blocking; the UI exits the process afterwards (see `exitApplication`). */
+  fun shutdown() {
     logger.info("Shutting down Bubbles...")
     runCatching { user?.disconnect() }
-    exitProcess(0)
   }
 }

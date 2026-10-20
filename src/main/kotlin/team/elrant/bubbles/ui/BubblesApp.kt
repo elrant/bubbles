@@ -1,57 +1,76 @@
 package team.elrant.bubbles.ui
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Window
-import androidx.compose.ui.window.rememberWindowState
 import team.elrant.bubbles.Bubbles
+import team.elrant.bubbles.ui.components.BubblesWindow
 import team.elrant.bubbles.ui.components.ConfirmExitDialog
+import team.elrant.bubbles.ui.components.createWindow
 import team.elrant.bubbles.ui.contacts.ContactListScreen
 import team.elrant.bubbles.ui.conversation.ConversationScreen
 import team.elrant.bubbles.ui.signin.SignInScreen
-import team.elrant.bubbles.ui.theme.BubblesTheme
 import java.awt.Dimension
+import java.awt.Toolkit
+import java.awt.Window
+import javax.swing.SwingUtilities
+import kotlin.concurrent.thread
+import kotlin.system.exitProcess
 
 /**
- * Messenger-style windows: one main window (sign-in, then the contact list) plus one window per
- * open conversation.
+ * Opens Messenger-style windows: one main window (sign-in, then the contact list) plus one window
+ * per open conversation. The main window's composition owns the conversation windows, so the app
+ * lives as long as the main window does. Call on the Swing thread.
  */
-@Composable
-fun BubblesApp(bubbles: Bubbles) {
-  var confirmExit by remember { mutableStateOf(false) }
-
-  BubblesTheme {
-    Window(
-      onCloseRequest = { confirmExit = true },
-      title = "Bubbles",
-      state = rememberWindowState(size = DpSize(360.dp, 640.dp)),
-    ) {
-      LaunchedEffect(Unit) { window.minimumSize = Dimension(300, 440) }
-      when (val user = bubbles.user) {
-        null -> SignInScreen(bubbles)
-        else -> ContactListScreen(bubbles, user)
-      }
-      if (confirmExit) ConfirmExitDialog(onConfirm = bubbles::shutdown, onDismiss = { confirmExit = false })
+fun showBubbles(bubbles: Bubbles) {
+  val confirmExit = mutableStateOf(false)
+  createWindow(
+    title = "Bubbles",
+    size = Dimension(360, 640),
+    minimumSize = Dimension(300, 440),
+    onCloseRequest = { confirmExit.value = true },
+  ) {
+    when (val user = bubbles.user) {
+      null -> SignInScreen(bubbles)
+      else -> ContactListScreen(bubbles, user)
     }
+    if (confirmExit.value) ConfirmExitDialog(onConfirm = { exitApplication(bubbles) }, onDismiss = { confirmExit.value = false })
+    ConversationWindows(bubbles)
+  }.isVisible = true
+}
 
-    val user = bubbles.user ?: return@BubblesTheme
-    for (jid in bubbles.conversations) key(jid) {
-      val contact = bubbles.contact(jid)
-      Window(
-        onCloseRequest = { bubbles.closeConversation(jid) },
-        title = "${contact.displayName} - Conversation",
-        state = rememberWindowState(size = DpSize(680.dp, 520.dp)),
-      ) {
-        LaunchedEffect(Unit) { window.minimumSize = Dimension(480, 360) }
-        ConversationScreen(bubbles, user, contact)
-      }
+/**
+ * Disconnects and exits from a separate thread. Safe to call from any thread.
+ *
+ * Under JBR's Wayland toolkit every window is disposed on the Swing thread first: otherwise its
+ * shutdown hook tears windows down off the Swing thread while holding the AWT tree lock, and
+ * Compose then blocks on the Swing thread, which is waiting for that same lock. Not done on X11,
+ * where exiting right after disposing races Skiko's OpenGL teardown and can hang in native code.
+ */
+fun exitApplication(bubbles: Bubbles) {
+  SwingUtilities.invokeLater {
+    if (Toolkit.getDefaultToolkit().javaClass.name == "sun.awt.wl.WLToolkit") {
+      Window.getWindows().forEach(Window::dispose)
+    }
+    thread(name = "Bubbles-Exit") {
+      bubbles.shutdown()
+      exitProcess(0)
+    }
+  }
+}
+
+@Composable
+private fun ConversationWindows(bubbles: Bubbles) {
+  val user = bubbles.user ?: return
+  for (jid in bubbles.conversations) key(jid) {
+    val contact = bubbles.contact(jid)
+    BubblesWindow(
+      title = "${contact.displayName} - Conversation",
+      size = Dimension(680, 520),
+      minimumSize = Dimension(480, 360),
+      onCloseRequest = { bubbles.closeConversation(jid) },
+    ) {
+      ConversationScreen(bubbles, user, contact)
     }
   }
 }
