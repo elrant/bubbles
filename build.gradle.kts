@@ -4,11 +4,11 @@ plugins {
   alias(libs.plugins.kotlin.jvm)
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.compose)
-  id("com.gradleup.shadow") version "9.3.0"
+  alias(libs.plugins.shadow)
 }
 
 group = "team.elrant"
-version = "0.0.0-devel"
+version = "0.0.1-devel-kt"
 
 repositories {
   mavenLocal()
@@ -17,16 +17,12 @@ repositories {
 }
 
 dependencies {
-  implementation(libs.bundles.annotations)
   implementation(compose.desktop.currentOs)
   implementation(compose.material3)
-
-  arrayOf(
-    libs.bundles.serialization,
-    libs.bundles.logging,
-    libs.bundles.xmpp,
-    libs.bundles.coroutines,
-  ).forEach { implementation(it); shadow(it) }
+  implementation(libs.bundles.serialization)
+  implementation(libs.bundles.logging)
+  implementation(libs.bundles.xmpp)
+  implementation(libs.bundles.coroutines)
 }
 
 kotlin {
@@ -37,7 +33,7 @@ kotlin {
 
 compose.desktop {
   application {
-    mainClass = "MainKt"
+    mainClass = "team.elrant.bubbles.MainKt"
   }
 }
 
@@ -47,5 +43,5 @@ tasks.withType<AbstractArchiveTask> {
 }
 
 tasks.jar {
-  manifest.attributes["Main-Class"] = "MainKt"
+  manifest.attributes["Main-Class"] = "team.elrant.bubbles.MainKt"
 }

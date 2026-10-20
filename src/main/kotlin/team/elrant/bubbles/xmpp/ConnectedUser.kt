@@ -1,54 +1,48 @@
 package team.elrant.bubbles.xmpp
 
-import com.fasterxml.jackson.annotation.JsonProperty
 import org.jivesoftware.smack.ConnectionConfiguration
 import org.jivesoftware.smack.chat2.ChatManager
+import org.jivesoftware.smack.packet.Presence
 import org.jivesoftware.smack.roster.Roster
+import org.jivesoftware.smack.roster.RosterListener
 import org.jivesoftware.smack.tcp.XMPPTCPConnection
 import org.jivesoftware.smack.tcp.XMPPTCPConnectionConfiguration
 import org.jivesoftware.smack.util.stringencoder.Base64
 import org.jxmpp.jid.BareJid
+import org.jxmpp.jid.Jid
 import org.jxmpp.jid.impl.JidCreate
 import org.slf4j.LoggerFactory
-import tools.jackson.core.JacksonException
-import tools.jackson.databind.ObjectMapper
-import java.io.File
-import java.io.IOException
+import team.elrant.bubbles.model.Contact
+import team.elrant.bubbles.model.Status
 import java.net.InetAddress
-import java.nio.file.Path
 import java.security.cert.X509Certificate
 import javax.net.ssl.SSLSession
 
 /**
- * Describes how the app's current user connects, behaves, sends messages, etc.
+ * The app's signed-in XMPP account: connection, roster, presence and messaging.
  *
- * @param password the user's password, or `null` if it was not persisted.
- * @param onMessage invoked (on a Smack thread) for every incoming chat message that has a body.
+ * Callbacks are invoked on Smack threads.
+ *
+ * @param onMessage invoked for every incoming chat message that has a body.
+ * @param onRosterChanged invoked when roster entries or contact presences change.
  */
 class ConnectedUser(
-  username: String,
-  private val password: String?,
-  serviceName: String,
+  val username: String,
+  private val password: String,
+  val serviceName: String,
   private val onMessage: (from: BareJid, body: String) -> Unit = { _, _ -> },
-) : AbstractUser(username, serviceName) {
-
+  private val onRosterChanged: () -> Unit = {},
+) {
   private var connection: XMPPTCPConnection? = null
   private var chat: ChatManager? = null
   private var roster: Roster? = null
 
-  /** The roster of this user. Only available after [initializeConnection]. */
-  fun roster(): Roster = checkNotNull(roster) { "Roster is not initialized." }
-
-  /** `true` if the password was not persisted, i.e. the user must re-enter it. */
-  fun passwordUnInit(): Boolean = password == null
-
-  val isLoggedIn: Boolean get() = connection?.isAuthenticated == true
+  val address: String get() = "$username@$serviceName"
 
   /**
    * Connects, logs in, sets up the chat manager and populates the roster. Blocking.
    */
   fun initializeConnection() {
-    checkNotNull(password) { "Cannot connect: no password available." }
     logger.info("logging in {}...", serviceName)
     val service = serviceName
     val conn = XMPPTCPConnection(
@@ -72,7 +66,46 @@ class ConnectedUser(
         onMessage(from, body)
       }
     }
-    roster = Roster.getInstanceFor(conn).also { it.reloadAndWait() }
+    roster = Roster.getInstanceFor(conn).also {
+      it.addRosterListener(object : RosterListener {
+        override fun entriesAdded(addresses: Collection<Jid>) = onRosterChanged()
+        override fun entriesUpdated(addresses: Collection<Jid>) = onRosterChanged()
+        override fun entriesDeleted(addresses: Collection<Jid>) = onRosterChanged()
+        override fun presenceChanged(presence: Presence) = onRosterChanged()
+      })
+      it.reloadAndWait()
+    }
+  }
+
+  /** Snapshot of the roster with each contact's current presence. */
+  fun contacts(): List<Contact> {
+    val roster = roster ?: return emptyList()
+    return roster.entries.map { entry ->
+      val presence = roster.getPresence(entry.jid)
+      Contact(
+        jid = entry.jid,
+        name = entry.name,
+        groups = entry.groups.map { it.name },
+        status = presence.toStatus(),
+        personalMessage = presence.status?.takeIf { it.isNotBlank() },
+      )
+    }
+  }
+
+  /** Broadcasts our presence. Blocking. */
+  fun setPresence(status: Status, personalMessage: String) {
+    val conn = connection ?: return
+    val presence = conn.stanzaFactory.buildPresenceStanza()
+      .ofType(Presence.Type.available)
+      .setMode(
+        when (status) {
+          Status.Busy -> Presence.Mode.dnd
+          Status.Away -> Presence.Mode.away
+          Status.Available, Status.Offline -> Presence.Mode.available
+        }
+      )
+    if (personalMessage.isNotBlank()) presence.setStatus(personalMessage)
+    conn.sendStanza(presence.build())
   }
 
   /** Sends [message] to [contact] (user@service.name). Blocking. */
@@ -89,22 +122,13 @@ class ConnectedUser(
     }
   }
 
-  /** Saves user information to a JSON file, including the password only if [savePassword] is set. */
-  fun saveUserToFile(filename: String, savePassword: Boolean) {
-    val data = UserData(username, serviceName, if (savePassword) password else null)
-    MAPPER.writerWithDefaultPrettyPrinter().writeValue(File(filename), data)
-    logger.info("User information saved to {}", filename)
+  /** Closes the connection. Blocking. */
+  fun disconnect() {
+    connection?.disconnect()
   }
-
-  private data class UserData(
-    @param:JsonProperty("username") val username: String?,
-    @param:JsonProperty("serviceName") val serviceName: String?,
-    @param:JsonProperty("password") val password: String?,
-  )
 
   companion object {
     private val logger = LoggerFactory.getLogger(ConnectedUser::class.java)
-    private val MAPPER = ObjectMapper()
 
     init {
       Base64.setEncoder(object : Base64.Encoder {
@@ -118,18 +142,11 @@ class ConnectedUser(
       })
     }
 
-    /** Loads a [ConnectedUser] from a JSON file previously written by [saveUserToFile]. */
-    @Throws(IOException::class)
-    fun fromFile(file: Path): ConnectedUser {
-      val data = try {
-        MAPPER.readValue(file.toFile(), UserData::class.java)
-      } catch (e: JacksonException) {
-        throw IOException("Could not parse user file $file", e)
-      }
-      val username = data.username ?: throw IOException("User file $file has no username")
-      val serviceName = data.serviceName ?: throw IOException("User file $file has no serviceName")
-      logger.info("User information loaded from {}", file)
-      return ConnectedUser(username, data.password, serviceName)
+    private fun Presence.toStatus(): Status = when {
+      !isAvailable -> Status.Offline
+      mode == Presence.Mode.dnd -> Status.Busy
+      mode == Presence.Mode.away || mode == Presence.Mode.xa -> Status.Away
+      else -> Status.Available
     }
 
     /** Verifies [hostname] against the peer certificate's SAN/CN without relying on the SSLSession peer host. */

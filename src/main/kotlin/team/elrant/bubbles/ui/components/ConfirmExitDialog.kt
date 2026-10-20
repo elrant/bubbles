@@ -1,4 +1,4 @@
-package team.elrant.bubbles.ui
+package team.elrant.bubbles.ui.components
 
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
