@@ -8,6 +8,10 @@ import java.nio.file.Path
 
 /**
  * Remembers the last signed-in address ("Remember me"). Passwords are never stored.
+ *
+ * I/O errors are logged and otherwise ignored.
+ *
+ * @param file JSON file to use; defaults to `$XDG_CONFIG_HOME/bubbles/account.json`.
  */
 class AccountStore(private val file: Path = defaultFile()) {
 
@@ -19,6 +23,7 @@ class AccountStore(private val file: Path = defaultFile()) {
     null
   }
 
+  /** Remembers [address], replacing any previous one. */
   fun save(address: String) = try {
     Files.createDirectories(file.parent)
     MAPPER.writerWithDefaultPrettyPrinter().writeValue(file.toFile(), SavedAccount(address))
@@ -26,6 +31,7 @@ class AccountStore(private val file: Path = defaultFile()) {
     logger.warn("Could not write {}: {}", file, e.message)
   }
 
+  /** Forgets the remembered address. */
   fun clear() = try {
     Files.deleteIfExists(file)
     Unit
@@ -33,12 +39,14 @@ class AccountStore(private val file: Path = defaultFile()) {
     logger.warn("Could not delete {}: {}", file, e.message)
   }
 
+  /** On-disk format of [file]. */
   private data class SavedAccount(@param:JsonProperty("address") val address: String?)
 
   companion object {
     private val logger = LoggerFactory.getLogger(AccountStore::class.java)
     private val MAPPER = ObjectMapper()
 
+    /** `account.json` under the XDG config directory, `~/.config` if `XDG_CONFIG_HOME` is unset. */
     private fun defaultFile(): Path {
       val configHome = System.getenv("XDG_CONFIG_HOME")?.takeIf { it.isNotBlank() }?.let(Path::of)
         ?: Path.of(System.getProperty("user.home"), ".config")

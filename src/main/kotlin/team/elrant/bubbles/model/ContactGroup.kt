@@ -1,5 +1,6 @@
 package team.elrant.bubbles.model
 
+/** A collapsible section of the contact list. */
 data class ContactGroup(val name: String, val contacts: List<Contact>)
 
 private const val OTHER_CONTACTS = "Other contacts"
@@ -8,6 +9,11 @@ private const val OFFLINE = "Offline"
 /**
  * Messenger-style grouping: online contacts under their roster groups (ungrouped ones under
  * "Other contacts", always last), followed by a single "Offline" group.
+ *
+ * A contact in several roster groups appears in each. Groups and their members are sorted by name,
+ * ignoring case; empty groups are left out.
+ *
+ * @param query keeps only contacts whose display name or JID contains it, ignoring case; blank keeps all.
  */
 fun groupContacts(contacts: List<Contact>, query: String): List<ContactGroup> {
   val matches = contacts.filter {

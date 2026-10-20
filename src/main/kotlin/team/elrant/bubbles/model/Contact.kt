@@ -2,6 +2,11 @@ package team.elrant.bubbles.model
 
 import org.jxmpp.jid.BareJid
 
+/**
+ * Presence of the user or a contact.
+ *
+ * @property label user-facing name.
+ */
 enum class Status(val label: String) {
   Available("Available"),
   Busy("Busy"),
@@ -14,6 +19,13 @@ enum class Status(val label: String) {
   }
 }
 
+/**
+ * A roster entry with its current presence.
+ *
+ * @property name roster nickname, if set.
+ * @property groups roster group names; empty if ungrouped.
+ * @property personalMessage the contact's presence status text, or `null` if none.
+ */
 data class Contact(
   val jid: BareJid,
   val name: String?,
@@ -21,6 +33,7 @@ data class Contact(
   val status: Status,
   val personalMessage: String?,
 ) {
+  /** The nickname, falling back to the JID. */
   val displayName: String get() = name?.takeIf { it.isNotBlank() } ?: jid.toString()
 
   companion object {

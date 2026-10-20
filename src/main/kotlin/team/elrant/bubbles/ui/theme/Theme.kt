@@ -58,6 +58,7 @@ val Status.color: Color
     Status.Offline -> Mocha.Overlay0
   }
 
+/** The app's Material theme (Catppuccin Mocha, Mauve accent). Wrap every composition root in it. */
 @Composable
 fun BubblesTheme(content: @Composable () -> Unit) {
   MaterialTheme(colorScheme = MochaMauve, content = content)

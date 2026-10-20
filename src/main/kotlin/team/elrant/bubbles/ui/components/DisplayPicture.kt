@@ -20,7 +20,12 @@ import androidx.compose.ui.unit.sp
 import team.elrant.bubbles.model.Status
 import team.elrant.bubbles.ui.theme.color
 
-/** Messenger-style display picture: initials inside a frame coloured by presence. */
+/**
+ * Messenger-style display picture: initials inside a frame coloured by presence.
+ *
+ * @param name name or address to take the initials from.
+ * @param size outer edge length; the frame and text scale with it.
+ */
 @Composable
 fun DisplayPicture(name: String, status: Status, size: Dp, modifier: Modifier = Modifier) {
   Box(
@@ -48,11 +53,13 @@ fun DisplayPicture(name: String, status: Status, size: Dp, modifier: Modifier = 
   }
 }
 
+/** Small circle in the presence colour of [status]. */
 @Composable
 fun StatusDot(status: Status, modifier: Modifier = Modifier, size: Dp = 10.dp) {
   Box(modifier.size(size).clip(CircleShape).background(status.color))
 }
 
+/** Up to two uppercase initials from the words of [name] (ignoring any `@domain`), or `?`. */
 private fun initials(name: String): String =
   name.substringBefore('@')
     .split(' ', '.', '_', '-')

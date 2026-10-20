@@ -22,7 +22,15 @@ import team.elrant.bubbles.model.Status
 import team.elrant.bubbles.store.AccountStore
 import team.elrant.bubbles.xmpp.ConnectedUser
 
-/** Application state; everything the UI renders is observable from here. */
+/**
+ * Application state; everything the UI renders is observable from here.
+ *
+ * State is Compose snapshot state, so call everything from the Swing thread (for [signIn], from a
+ * coroutine on [Dispatchers.Main]). Network work is pushed to [Dispatchers.IO], and Smack callbacks
+ * are moved back to the main dispatcher before they touch state.
+ *
+ * @param accounts where the "Remember me" address is kept.
+ */
 class Bubbles(private val accounts: AccountStore = AccountStore()) {
   private val logger = LoggerFactory.getLogger(Bubbles::class.java)
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -30,12 +38,19 @@ class Bubbles(private val accounts: AccountStore = AccountStore()) {
   /** Address remembered from the last "Remember me" sign-in. */
   val savedAddress: String? = accounts.load()
 
+  /** The signed-in account, or `null` while on the sign-in screen. */
   var user by mutableStateOf<ConnectedUser?>(null)
     private set
+
+  /** Latest roster snapshot of [user]; refreshed whenever the roster or a presence changes. */
   var contacts by mutableStateOf<List<Contact>>(emptyList())
     private set
+
+  /** Our own presence, as last chosen by the user. */
   var status by mutableStateOf(Status.Available)
     private set
+
+  /** Our own personal (presence status) message; empty for none. */
   var personalMessage by mutableStateOf("")
     private set
 
@@ -47,11 +62,16 @@ class Bubbles(private val accounts: AccountStore = AccountStore()) {
   /** Read-only view; does not create an entry, so it is safe to call during composition. */
   fun history(contact: BareJid): List<ChatMessage> = histories[contact].orEmpty()
 
+  /** The roster entry for [jid], or a [Contact.stranger] placeholder if they aren't in the roster. */
   fun contact(jid: BareJid): Contact = contacts.firstOrNull { it.jid == jid } ?: Contact.stranger(jid)
 
   /**
    * Signs in as [address] (`name@server`) and switches the UI to the contact list. Throws on
    * failure; cancelling the calling coroutine aborts the attempt.
+   *
+   * @param status initial presence, published right after login.
+   * @param rememberMe whether to save [address] for next time; `false` forgets any saved one.
+   * @throws IllegalArgumentException if [address] isn't a valid bare JID.
    */
   suspend fun signIn(address: String, password: String, status: Status, rememberMe: Boolean) {
     val jid = try {
@@ -88,6 +108,10 @@ class Bubbles(private val accounts: AccountStore = AccountStore()) {
     logger.info("Roster: {}", contacts)
   }
 
+  /**
+   * Returns to the sign-in screen, dropping contacts, conversations and history. The connection
+   * is closed in the background. Does nothing when not signed in.
+   */
   fun signOut() {
     val current = user ?: return
     user = null
@@ -99,16 +123,19 @@ class Bubbles(private val accounts: AccountStore = AccountStore()) {
     scope.launch(Dispatchers.IO) { runCatching { current.disconnect() } }
   }
 
+  /** Sets our presence and broadcasts it. */
   fun changeStatus(status: Status) {
     this.status = status
     publishPresence()
   }
 
+  /** Sets our personal message (trimmed) and broadcasts it along with the current [status]. */
   fun changePersonalMessage(message: String) {
     personalMessage = message.trim()
     publishPresence()
   }
 
+  /** Sends the current [status] and [personalMessage] in the background; failures are only logged. */
   private fun publishPresence() {
     val current = user ?: return
     val status = status
@@ -119,25 +146,30 @@ class Bubbles(private val accounts: AccountStore = AccountStore()) {
     }
   }
 
+  /** Opens a conversation window with [jid], unless one is already open. */
   fun openConversation(jid: BareJid) {
     if (jid !in openConversations) openConversations += jid
   }
 
+  /** Closes the conversation window with [jid]. Its history is kept until sign-out. */
   fun closeConversation(jid: BareJid) {
     openConversations -= jid
   }
 
+  /** Adds [text] to the history with [to] and sends it in the background. */
   fun sendMessage(to: BareJid, text: String) {
     val current = user ?: return
     mutableHistory(to) += ChatMessage(text, outgoing = true)
     scope.launch(Dispatchers.IO) { current.sendMessage(to, text) }
   }
 
+  /** Records an incoming message and pops up its conversation window. */
   private fun receive(from: BareJid, body: String) {
     mutableHistory(from) += ChatMessage(body, outgoing = false)
     openConversation(from)
   }
 
+  /** The history with [contact], created if missing. Not for use during composition (see [history]). */
   private fun mutableHistory(contact: BareJid) = histories.getOrPut(contact) { mutableStateListOf() }
 
   /** Disconnects for good. Blocking; the UI exits the process afterwards (see `exitApplication`). */

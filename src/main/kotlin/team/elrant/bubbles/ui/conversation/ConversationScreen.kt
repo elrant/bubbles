@@ -51,6 +51,10 @@ private val DATE = DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT)
 /** A new "X says:" run starts when the sender changes or after this much silence. */
 private val RUN_GAP = Duration.ofMinutes(5)
 
+/**
+ * Conversation window contents: contact header, history, compose box and both display pictures.
+ * Enter sends the draft, Shift+Enter inserts a newline.
+ */
 @Composable
 fun ConversationScreen(bubbles: Bubbles, user: ConnectedUser, contact: Contact) {
   val messages = bubbles.history(contact.jid)
@@ -99,6 +103,7 @@ fun ConversationScreen(bubbles: Bubbles, user: ConnectedUser, contact: Contact) 
   }
 }
 
+/** The contact's name, status, personal message and JID. */
 @Composable
 private fun ContactHeader(contact: Contact) {
   Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
@@ -117,6 +122,7 @@ private fun ContactHeader(contact: Contact) {
   }
 }
 
+/** Messages grouped into "X says:" runs (see [RUN_GAP]); scrolls to the newest message as they arrive. */
 @Composable
 private fun History(messages: List<ChatMessage>, selfName: String, contactName: String, modifier: Modifier) {
   val listState = rememberLazyListState()
@@ -151,6 +157,7 @@ private fun History(messages: List<ChatMessage>, selfName: String, contactName: 
   }
 }
 
+/** When the last incoming message arrived; hidden until there is one. */
 @Composable
 private fun StatusBar(messages: List<ChatMessage>) {
   val last = messages.lastOrNull { !it.outgoing } ?: return

@@ -21,8 +21,11 @@ import javax.net.ssl.SSLSession
 /**
  * The app's signed-in XMPP account: connection, roster, presence and messaging.
  *
- * Callbacks are invoked on Smack threads.
+ * Nothing happens on the network until [initializeConnection]. Callbacks are invoked on Smack
+ * threads.
  *
+ * @param username localpart of the account's JID.
+ * @param serviceName XMPP domain; also resolved as the host to connect to.
  * @param onMessage invoked for every incoming chat message that has a body.
  * @param onRosterChanged invoked when roster entries or contact presences change.
  */
@@ -37,10 +40,14 @@ class ConnectedUser(
   private var chat: ChatManager? = null
   private var roster: Roster? = null
 
+  /** The account's bare JID, `username@serviceName`. */
   val address: String get() = "$username@$serviceName"
 
   /**
    * Connects, logs in, sets up the chat manager and populates the roster. Blocking.
+   *
+   * TLS is required, and the certificate is checked against [serviceName] by [verifyCertHostname].
+   * Throws if the connection or login fails.
    */
   fun initializeConnection() {
     logger.info("logging in {}...", serviceName)
@@ -77,7 +84,7 @@ class ConnectedUser(
     }
   }
 
-  /** Snapshot of the roster with each contact's current presence. */
+  /** Snapshot of the roster with each contact's current presence; empty before [initializeConnection]. */
   fun contacts(): List<Contact> {
     val roster = roster ?: return emptyList()
     return roster.entries.map { entry ->
@@ -92,7 +99,12 @@ class ConnectedUser(
     }
   }
 
-  /** Broadcasts our presence. Blocking. */
+  /**
+   * Broadcasts our presence. Blocking. [Status.Offline] is sent as plain available, since it
+   * isn't selectable.
+   *
+   * @param personalMessage presence status text; blank sends none.
+   */
   fun setPresence(status: Status, personalMessage: String) {
     val conn = connection ?: return
     val presence = conn.stanzaFactory.buildPresenceStanza()
@@ -108,7 +120,7 @@ class ConnectedUser(
     conn.sendStanza(presence.build())
   }
 
-  /** Sends [message] to [contact] (user@service.name). Blocking. */
+  /** Sends [message] to [contact] (user@service.name). Blocking. Failures are logged, not thrown. */
   fun sendMessage(contact: BareJid, message: String) {
     try {
       val entity = contact.asEntityBareJidIfPossible()
@@ -130,6 +142,8 @@ class ConnectedUser(
   companion object {
     private val logger = LoggerFactory.getLogger(ConnectedUser::class.java)
 
+    // Smack's SASL login needs a Base64 encoder, normally registered by smack-java11, which isn't a
+    // dependency; back it with the JDK's.
     init {
       Base64.setEncoder(object : Base64.Encoder {
         private val encoder = java.util.Base64.getEncoder()
@@ -142,6 +156,7 @@ class ConnectedUser(
       })
     }
 
+    /** Maps a contact's presence to a [Status]; extended away (`xa`) counts as [Status.Away]. */
     private fun Presence.toStatus(): Status = when {
       !isAvailable -> Status.Offline
       mode == Presence.Mode.dnd -> Status.Busy

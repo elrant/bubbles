@@ -59,6 +59,7 @@ fun exitApplication(bubbles: Bubbles) {
   }
 }
 
+/** One window per [Bubbles.conversations] entry; closing a window closes its conversation. */
 @Composable
 private fun ConversationWindows(bubbles: Bubbles) {
   val user = bubbles.user ?: return

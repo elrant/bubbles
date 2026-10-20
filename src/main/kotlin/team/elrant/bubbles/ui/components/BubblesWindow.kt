@@ -20,6 +20,9 @@ import javax.swing.WindowConstants
  * Used instead of Compose's `Window` because only a [ComposePanel] can render through Swing
  * graphics, which is what JBR's native Wayland toolkit needs. Each panel is its own composition,
  * so the theme is applied here.
+ *
+ * @param onCloseRequest called when the user tries to close the window; the window stays open
+ *   unless the caller disposes it.
  */
 fun createWindow(
   title: String,
@@ -38,7 +41,12 @@ fun createWindow(
   setLocationRelativeTo(null)
 }
 
-/** A [createWindow] window that is shown while this composable is in the composition. */
+/**
+ * A [createWindow] window that is shown while this composable is in the composition.
+ *
+ * [size] and [minimumSize] only apply when the window is first created; [title], [content] and
+ * [onCloseRequest] follow recomposition.
+ */
 @Composable
 fun BubblesWindow(
   title: String,

@@ -44,6 +44,11 @@ import team.elrant.bubbles.ui.components.DisplayPicture
 import team.elrant.bubbles.ui.components.StatusDot
 import team.elrant.bubbles.ui.components.StatusSelector
 
+/**
+ * Sign-in form, prefilled with the remembered address. While signing in it shows progress with a
+ * Cancel button; errors are shown in a dialog. On success [Bubbles.user] is set, which swaps this
+ * screen for the contact list.
+ */
 @Composable
 fun SignInScreen(bubbles: Bubbles) {
   var address by remember { mutableStateOf(bubbles.savedAddress.orEmpty()) }
@@ -113,6 +118,7 @@ fun SignInScreen(bubbles: Bubbles) {
   }
 }
 
+/** Stateless address/password/status/"Remember me" fields; Enter in either text field submits. */
 @Composable
 private fun SignInForm(
   address: String, onAddress: (String) -> Unit,

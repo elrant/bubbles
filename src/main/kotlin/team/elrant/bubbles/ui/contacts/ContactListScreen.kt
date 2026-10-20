@@ -44,6 +44,7 @@ import team.elrant.bubbles.ui.components.DisplayPicture
 import team.elrant.bubbles.ui.components.StatusSelector
 import team.elrant.bubbles.xmpp.ConnectedUser
 
+/** Main window once signed in: own profile header, contact search and the grouped contact list. */
 @Composable
 fun ContactListScreen(bubbles: Bubbles, user: ConnectedUser) {
   var query by remember { mutableStateOf("") }
@@ -84,6 +85,10 @@ private fun SelfHeader(bubbles: Bubbles, user: ConnectedUser) {
   }
 }
 
+/**
+ * Borderless single-line editor for the personal message. Edits are committed through [onCommit]
+ * when the field loses focus (Enter clears focus), and only if the text changed.
+ */
 @Composable
 private fun PersonalMessageField(current: String, onCommit: (String) -> Unit, modifier: Modifier = Modifier) {
   var draft by remember(current) { mutableStateOf(current) }
@@ -107,6 +112,10 @@ private fun PersonalMessageField(current: String, onCommit: (String) -> Unit, mo
   )
 }
 
+/**
+ * Collapsible [groups] of contacts. A click selects a contact, a double-click calls [onOpen].
+ * Shows [emptyText] when there are no groups.
+ */
 @Composable
 private fun ContactList(groups: List<ContactGroup>, emptyText: String, onOpen: (BareJid) -> Unit) {
   val collapsed = remember { mutableStateMapOf<String, Boolean>() }
@@ -147,6 +156,7 @@ private fun ContactList(groups: List<ContactGroup>, emptyText: String, onOpen: (
   }
 }
 
+/** Display picture, name and personal message of one contact. */
 @Composable
 private fun ContactRow(contact: Contact, selected: Boolean, onSelect: () -> Unit, onOpen: () -> Unit) {
   Row(

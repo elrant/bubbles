@@ -5,6 +5,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 
+/** Yes/No prompt shown before quitting from the main window. */
 @Composable
 fun ConfirmExitDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
   AlertDialog(
