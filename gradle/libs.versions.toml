@@ -1,6 +1,6 @@
 [versions]
 # serialization
-jackson             = "3.2.0"
+jackson             = "3.2.4"
 jackson-annotations = "2.22"
 jackson-bom         = "3.2.0"
 jackson-parent      = "2.22"
@@ -13,7 +13,7 @@ tinylog = "2.8.0-M1"
 jxmpp = "1.1.0"
 mdns = "1.1.1"
 smack = "4.5.0-rc1"
-bcprov = "1.84"
+bcprov = "1.85"
 
 # kotlin / compose
 kotlin = "2.3.0"
