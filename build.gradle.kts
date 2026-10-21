@@ -3,6 +3,7 @@ plugins {
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.compose)
   alias(libs.plugins.shadow)
+  alias(libs.plugins.detekt)
 }
 
 group = "team.elrant"
@@ -23,6 +24,9 @@ dependencies {
   implementation(libs.bundles.logging)
   implementation(libs.bundles.xmpp)
   implementation(libs.bundles.coroutines)
+
+  detektPlugins(libs.detekt.ktlint)
+  detektPlugins(libs.compose.rules.detekt)
 }
 
 // JetBrains Runtime is required everywhere (compile and run): the app's `--wayland` mode needs its
@@ -35,6 +39,14 @@ val jbr: Action<JavaToolchainSpec> = Action {
 
 kotlin {
   jvmToolchain(jbr)
+}
+
+// Static analysis: `./gradlew detekt`, also run by `check`. Rules are detekt's defaults plus Compose rules,
+// with overrides in config/detekt/detekt.yml.
+detekt {
+  buildUponDefaultConfig = true
+  allRules = true
+  config.setFrom(file("config/detekt/detekt.yml"))
 }
 
 tasks.withType<AbstractArchiveTask> {

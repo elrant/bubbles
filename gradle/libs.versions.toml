@@ -21,6 +21,10 @@ compose = "1.12.2"
 coroutines = "1.10.2"
 shadow = "9.3.0"
 
+# lint
+detekt        = "2.0.0-alpha.6"
+compose-rules = "0.6.8"
+
 [libraries]
 # serialization
 jackson-annotations = { group = "com.fasterxml.jackson.core", name = "jackson-annotations", version.ref = "jackson-annotations"   }
@@ -48,6 +52,10 @@ smack-tcp     = { group = "org.igniterealtime.smack", name = "smack-tcp"        
 smack-ext     = { group = "org.igniterealtime.smack", name = "smack-extensions"      , version.ref = "smack"  }
 bcprov        = { group = "org.bouncycastle"        , name = "bcprov-jdk18on"        , version.ref = "bcprov" }
 
+# lint
+detekt-ktlint        = { group = "dev.detekt"             , name = "detekt-rules-ktlint-wrapper", version.ref = "detekt" }
+compose-rules-detekt = { group = "io.nlopez.compose.rules", name = "detekt", version.ref = "compose-rules" }
+
 # coroutines
 coroutines-swing = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-swing", version.ref = "coroutines" }
 
@@ -56,6 +64,7 @@ kotlin-jvm     = { id = "org.jetbrains.kotlin.jvm"            , version.ref = "k
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose" , version.ref = "kotlin" }
 compose        = { id = "org.jetbrains.compose"               , version.ref = "compose" }
 shadow         = { id = "com.gradleup.shadow"                 , version.ref = "shadow" }
+detekt         = { id = "dev.detekt"                          , version.ref = "detekt" }
 
 [bundles]
 serialization = [

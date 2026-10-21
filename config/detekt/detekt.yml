@@ -1,0 +1,113 @@
+# Overrides on top of detekt's default config, with every rule enabled (`allRules` in build.gradle.kts).
+# Each disabled rule says why; prefer fixing the code over adding to this list.
+
+Compose:
+  active: true
+  # Compose's strong skipping (on by default since Kotlin 2.0.20) already skips unchanged List parameters.
+  UnstableCollections:
+    active: false
+
+comments:
+  # Private members are documented like the rest of the code, as with Javadoc.
+  DocumentationOverPrivateFunction:
+    active: false
+  DocumentationOverPrivateProperty:
+    active: false
+  UndocumentedPublicClass:
+    ignoreDefaultCompanionObject: true
+  # Enum constants like `Available` name themselves.
+  UndocumentedPublicProperty:
+    ignoreEnumEntries: true
+
+complexity:
+  # `return@lambda` is Kotlin's only way to return early from a lambda, like `return` in a Java lambda.
+  LabeledExpression:
+    active: false
+  TooManyFunctions:
+    # Bubbles is the app's single state holder; count only its public API.
+    ignorePrivate: true
+
+naming:
+  FunctionNaming:
+    # Composables are PascalCase by convention (enforced by Compose's ComposableNaming).
+    ignoreAnnotated: ['Composable']
+
+# Formatting (ktlint). Indentation is 2 spaces, as in .editorconfig.
+ktlint:
+  # Duplicate of naming>FunctionNaming.
+  FunctionName:
+    active: false
+  # The code groups related arguments on one line (`value, onValueChange`, `minLines = 3, maxLines = 5`).
+  ArgumentListWrapping:
+    active: false
+  ParameterListWrapping:
+    active: false
+  # Would split `Builder.builder()` and `val x = try {` onto separate lines.
+  ChainMethodContinuation:
+    active: false
+  MultilineExpressionWrapping:
+    active: false
+  AnnotationOnSeparateLine:
+    indentSize: 2
+  BinaryExpressionWrapping:
+    indentSize: 2
+  ChainWrapping:
+    indentSize: 2
+  ClassSignature:
+    indentSize: 2
+  CommentWrapping:
+    indentSize: 2
+  ConditionWrapping:
+    indentSize: 2
+  ContextReceiverListWrapping:
+    indentSize: 2
+  ContextReceiverMapping:
+    indentSize: 2
+  EnumWrapping:
+    indentSize: 2
+  ExpressionOperandWrapping:
+    indentSize: 2
+  FunctionExpressionBody:
+    indentSize: 2
+  FunctionLiteral:
+    indentSize: 2
+  FunctionSignature:
+    indentSize: 2
+  IfElseBracing:
+    indentSize: 2
+  IfElseWrapping:
+    indentSize: 2
+  Indentation:
+    indentSize: 2
+  KdocWrapping:
+    indentSize: 2
+  ModifierListSpacing:
+    indentSize: 2
+  MultiLineIfElse:
+    indentSize: 2
+  MultilineLoop:
+    indentSize: 2
+  NoEmptyFirstLineInClassBody:
+    indentSize: 2
+  NoSingleLineBlockComment:
+    indentSize: 2
+  ParameterWrapping:
+    indentSize: 2
+  PropertyWrapping:
+    indentSize: 2
+  SpacingAroundCurly:
+    indentSize: 2
+  StatementWrapping:
+    indentSize: 2
+  StringTemplateIndent:
+    indentSize: 2
+  TryCatchFinallySpacing:
+    indentSize: 2
+  TypeArgumentListSpacing:
+    indentSize: 2
+  TypeParameterListSpacing:
+    indentSize: 2
+  WhenEntryBracing:
+    indentSize: 2
+  Wrapping:
+    indentSize: 2

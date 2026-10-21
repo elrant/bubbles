@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
@@ -46,9 +47,9 @@ import team.elrant.bubbles.xmpp.ConnectedUser
 
 /** Main window once signed in: own profile header, contact search and the grouped contact list. */
 @Composable
-fun ContactListScreen(bubbles: Bubbles, user: ConnectedUser) {
+fun ContactListScreen(bubbles: Bubbles, user: ConnectedUser, modifier: Modifier = Modifier) {
   var query by remember { mutableStateOf("") }
-  Surface(Modifier.fillMaxSize()) {
+  Surface(modifier.fillMaxSize()) {
     Column {
       SelfHeader(bubbles, user)
       OutlinedTextField(
@@ -57,9 +58,12 @@ fun ContactListScreen(bubbles: Bubbles, user: ConnectedUser) {
         placeholder = { Text("Search contacts…") }, singleLine = true,
       )
       HorizontalDivider()
-      ContactList(groupContacts(bubbles.contacts, query), emptyText = if (query.isBlank()) "No contacts yet" else "No matches") {
-        bubbles.openConversation(it)
-      }
+      ContactList(
+        groupContacts(bubbles.contacts, query),
+        emptyText = if (query.isBlank()) "No contacts yet" else "No matches",
+        avatar = bubbles::avatar,
+        onOpen = bubbles::openConversation,
+      )
     }
   }
 }
@@ -69,7 +73,7 @@ fun ContactListScreen(bubbles: Bubbles, user: ConnectedUser) {
 private fun SelfHeader(bubbles: Bubbles, user: ConnectedUser) {
   Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
     Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-      DisplayPicture(user.username, bubbles.status, 64.dp)
+      DisplayPicture(user.username, bubbles.status, 64.dp, picture = bubbles.avatar(user.jid))
       Spacer(Modifier.width(12.dp))
       Column(Modifier.weight(1f)) {
         StatusSelector(onSelect = bubbles::changeStatus, onSignOut = bubbles::signOut) {
@@ -79,7 +83,11 @@ private fun SelfHeader(bubbles: Bubbles, user: ConnectedUser) {
             maxLines = 1, overflow = TextOverflow.Ellipsis,
           )
         }
-        PersonalMessageField(bubbles.personalMessage, bubbles::changePersonalMessage, Modifier.padding(start = 4.dp, top = 2.dp))
+        PersonalMessageField(
+          bubbles.personalMessage,
+          bubbles::changePersonalMessage,
+          Modifier.padding(start = 4.dp, top = 2.dp),
+        )
       }
     }
   }
@@ -99,7 +107,11 @@ private fun PersonalMessageField(current: String, onCommit: (String) -> Unit, mo
     modifier
       .fillMaxWidth()
       .onFocusChanged { if (!it.isFocused && draft.trim() != current) onCommit(draft) }
-      .onPreviewKeyEvent { if (it.key == Key.Enter) { focus.clearFocus(); true } else false },
+      .onPreviewKeyEvent {
+        val enter = it.key == Key.Enter
+        if (enter) focus.clearFocus()
+        enter
+      },
     singleLine = true,
     textStyle = style,
     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
@@ -113,11 +125,16 @@ private fun PersonalMessageField(current: String, onCommit: (String) -> Unit, mo
 }
 
 /**
- * Collapsible [groups] of contacts. A click selects a contact, a double-click calls [onOpen].
- * Shows [emptyText] when there are no groups.
+ * Collapsible [groups] of contacts, with display pictures from [avatar]. A click selects a contact,
+ * a double-click calls [onOpen]. Shows [emptyText] when there are no groups.
  */
 @Composable
-private fun ContactList(groups: List<ContactGroup>, emptyText: String, onOpen: (BareJid) -> Unit) {
+private fun ContactList(
+  groups: List<ContactGroup>,
+  emptyText: String,
+  avatar: (BareJid) -> ImageBitmap?,
+  onOpen: (BareJid) -> Unit,
+) {
   val collapsed = remember { mutableStateMapOf<String, Boolean>() }
   var selected by remember { mutableStateOf<BareJid?>(null) }
 
@@ -129,23 +146,24 @@ private fun ContactList(groups: List<ContactGroup>, emptyText: String, onOpen: (
   }
 
   LazyColumn(Modifier.fillMaxSize()) {
-    for (group in groups) {
-      val isCollapsed = collapsed[group.name] == true
-      item(key = "group:${group.name}") {
+    for ((name, members) in groups) {
+      val isCollapsed = collapsed[name] == true
+      item(key = "group:$name") {
         Text(
-          "${if (isCollapsed) "▸" else "▾"} ${group.name} (${group.contacts.size})",
+          "${if (isCollapsed) "▸" else "▾"} $name (${members.size})",
           Modifier
             .fillMaxWidth()
-            .clickable { collapsed[group.name] = !isCollapsed }
+            .clickable { collapsed[name] = !isCollapsed }
             .padding(horizontal = 12.dp, vertical = 6.dp),
           style = MaterialTheme.typography.labelLarge,
           color = MaterialTheme.colorScheme.primary,
         )
       }
       if (!isCollapsed) {
-        items(group.contacts, key = { "contact:${group.name}:${it.jid}" }) { contact ->
+        items(members, key = { "contact:$name:${it.jid}" }) { contact ->
           ContactRow(
             contact,
+            picture = avatar(contact.jid),
             selected = contact.jid == selected,
             onSelect = { selected = contact.jid },
             onOpen = { onOpen(contact.jid) },
@@ -158,7 +176,13 @@ private fun ContactList(groups: List<ContactGroup>, emptyText: String, onOpen: (
 
 /** Display picture, name and personal message of one contact. */
 @Composable
-private fun ContactRow(contact: Contact, selected: Boolean, onSelect: () -> Unit, onOpen: () -> Unit) {
+private fun ContactRow(
+  contact: Contact,
+  picture: ImageBitmap?,
+  selected: Boolean,
+  onSelect: () -> Unit,
+  onOpen: () -> Unit,
+) {
   Row(
     Modifier
       .fillMaxWidth()
@@ -167,9 +191,13 @@ private fun ContactRow(contact: Contact, selected: Boolean, onSelect: () -> Unit
       .padding(start = 24.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    DisplayPicture(contact.displayName, contact.status, 32.dp)
+    DisplayPicture(contact.displayName, contact.status, 32.dp, picture = picture)
     Spacer(Modifier.width(10.dp))
-    Text(contact.displayName, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Text(
+      contact.displayName,
+      style = MaterialTheme.typography.bodyMedium,
+      maxLines = 1, overflow = TextOverflow.Ellipsis,
+    )
     contact.personalMessage?.let {
       Text(
         " - $it",

@@ -21,8 +21,12 @@ import javax.swing.WindowConstants
  * graphics, which is what JBR's native Wayland toolkit needs. Each panel is its own composition,
  * so the theme is applied here.
  *
+ * @param title window title.
+ * @param size initial size, in pixels.
+ * @param minimumSize smallest size the user can resize it to.
  * @param onCloseRequest called when the user tries to close the window; the window stays open
  *   unless the caller disposes it.
+ * @param content the window's contents.
  */
 fun createWindow(
   title: String,

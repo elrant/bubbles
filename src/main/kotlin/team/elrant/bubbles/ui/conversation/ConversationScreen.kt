@@ -56,7 +56,7 @@ private val RUN_GAP = Duration.ofMinutes(5)
  * Enter sends the draft, Shift+Enter inserts a newline.
  */
 @Composable
-fun ConversationScreen(bubbles: Bubbles, user: ConnectedUser, contact: Contact) {
+fun ConversationScreen(bubbles: Bubbles, user: ConnectedUser, contact: Contact, modifier: Modifier = Modifier) {
   val messages = bubbles.history(contact.jid)
   var draft by remember(contact.jid) { mutableStateOf("") }
 
@@ -67,37 +67,23 @@ fun ConversationScreen(bubbles: Bubbles, user: ConnectedUser, contact: Contact) 
     draft = ""
   }
 
-  Surface(Modifier.fillMaxSize()) {
+  Surface(modifier.fillMaxSize()) {
     Row {
       Column(Modifier.weight(1f).fillMaxHeight()) {
         ContactHeader(contact)
         HorizontalDivider()
-        History(messages, selfName = user.username, contactName = contact.displayName, Modifier.weight(1f))
-        Row(
-          Modifier.padding(8.dp),
-          horizontalArrangement = Arrangement.spacedBy(8.dp),
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          OutlinedTextField(
-            draft, { draft = it },
-            Modifier.weight(1f).onPreviewKeyEvent {
-              // Enter sends, Shift+Enter inserts a newline.
-              if (it.key == Key.Enter && !it.isShiftPressed) {
-                if (it.type == KeyEventType.KeyDown) send()
-                true
-              } else false
-            },
-            minLines = 3, maxLines = 5,
-          )
-          Button(onClick = ::send) { Text("Send") }
-        }
+        History(messages, selfName = user.username, contactName = contact.displayName, modifier = Modifier.weight(1f))
+        ComposeBox(draft, { draft = it }, onSend = ::send)
         StatusBar(messages)
       }
       VerticalDivider()
-      Column(Modifier.width(128.dp).fillMaxHeight().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        DisplayPicture(contact.displayName, contact.status, 104.dp)
+      Column(
+        Modifier.width(128.dp).fillMaxHeight().padding(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+      ) {
+        DisplayPicture(contact.displayName, contact.status, 104.dp, picture = bubbles.avatar(contact.jid))
         Spacer(Modifier.weight(1f))
-        DisplayPicture(user.username, bubbles.status, 104.dp)
+        DisplayPicture(user.username, bubbles.status, 104.dp, picture = bubbles.avatar(user.jid))
       }
     }
   }
@@ -107,7 +93,11 @@ fun ConversationScreen(bubbles: Bubbles, user: ConnectedUser, contact: Contact) 
 @Composable
 private fun ContactHeader(contact: Contact) {
   Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
-    Text(contact.displayName, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Text(
+      contact.displayName,
+      style = MaterialTheme.typography.titleLarge,
+      maxLines = 1, overflow = TextOverflow.Ellipsis,
+    )
     Row(verticalAlignment = Alignment.CenterVertically) {
       StatusDot(contact.status, size = 8.dp)
       Spacer(Modifier.width(6.dp))
@@ -118,13 +108,22 @@ private fun ContactHeader(contact: Contact) {
         maxLines = 1, overflow = TextOverflow.Ellipsis,
       )
     }
-    Text("<${contact.jid}>", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(
+      "<${contact.jid}>",
+      style = MaterialTheme.typography.labelSmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
   }
 }
 
 /** Messages grouped into "X says:" runs (see [RUN_GAP]); scrolls to the newest message as they arrive. */
 @Composable
-private fun History(messages: List<ChatMessage>, selfName: String, contactName: String, modifier: Modifier) {
+private fun History(
+  messages: List<ChatMessage>,
+  selfName: String,
+  contactName: String,
+  modifier: Modifier = Modifier,
+) {
   val listState = rememberLazyListState()
   LaunchedEffect(messages.size) {
     if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
@@ -133,7 +132,8 @@ private fun History(messages: List<ChatMessage>, selfName: String, contactName: 
   LazyColumn(modifier.fillMaxWidth().padding(horizontal = 12.dp), state = listState) {
     itemsIndexed(messages) { index, message ->
       val previous = messages.getOrNull(index - 1)
-      val startsRun = previous == null || previous.outgoing != message.outgoing ||
+      val startsRun = previous == null ||
+        previous.outgoing != message.outgoing ||
         Duration.between(previous.time, message.time) > RUN_GAP
       Column {
         if (startsRun) {
@@ -154,6 +154,27 @@ private fun History(messages: List<ChatMessage>, selfName: String, contactName: 
         Text(message.body, Modifier.padding(start = 16.dp, top = 2.dp))
       }
     }
+  }
+}
+
+/** Draft editor and Send button. Enter calls [onSend], Shift+Enter inserts a newline. */
+@Composable
+private fun ComposeBox(draft: String, onDraftChange: (String) -> Unit, onSend: () -> Unit) {
+  Row(
+    Modifier.padding(8.dp),
+    horizontalArrangement = Arrangement.spacedBy(8.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    OutlinedTextField(
+      draft, onDraftChange,
+      Modifier.weight(1f).onPreviewKeyEvent {
+        val send = it.key == Key.Enter && !it.isShiftPressed
+        if (send && it.type == KeyEventType.KeyDown) onSend()
+        send
+      },
+      minLines = 3, maxLines = 5,
+    )
+    Button(onClick = onSend) { Text("Send") }
   }
 }
 

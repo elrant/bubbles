@@ -35,10 +35,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import team.elrant.bubbles.Bubbles
+import team.elrant.bubbles.SignInException
 import team.elrant.bubbles.model.Status
 import team.elrant.bubbles.ui.components.DisplayPicture
 import team.elrant.bubbles.ui.components.StatusDot
@@ -50,7 +50,7 @@ import team.elrant.bubbles.ui.components.StatusSelector
  * screen for the contact list.
  */
 @Composable
-fun SignInScreen(bubbles: Bubbles) {
+fun SignInScreen(bubbles: Bubbles, modifier: Modifier = Modifier) {
   var address by remember { mutableStateOf(bubbles.savedAddress.orEmpty()) }
   var password by remember { mutableStateOf("") }
   var status by remember { mutableStateOf(Status.Available) }
@@ -70,17 +70,15 @@ fun SignInScreen(bubbles: Bubbles) {
     job = scope.launch {
       try {
         bubbles.signIn(address.trim(), password, status, rememberMe)
-      } catch (e: CancellationException) {
-        throw e
-      } catch (e: Exception) {
-        error = "Could not sign in: ${e.message ?: e::class.simpleName}"
+      } catch (e: SignInException) {
+        error = "Could not sign in: ${e.message}"
       } finally {
         busy = false
       }
     }
   }
 
-  Surface(Modifier.fillMaxSize()) {
+  Surface(modifier.fillMaxSize()) {
     Column(
       Modifier.verticalScroll(rememberScrollState()).padding(24.dp),
       horizontalAlignment = Alignment.CenterHorizontally,
@@ -121,10 +119,14 @@ fun SignInScreen(bubbles: Bubbles) {
 /** Stateless address/password/status/"Remember me" fields; Enter in either text field submits. */
 @Composable
 private fun SignInForm(
-  address: String, onAddress: (String) -> Unit,
-  password: String, onPassword: (String) -> Unit,
-  status: Status, onStatus: (Status) -> Unit,
-  rememberMe: Boolean, onRememberMe: (Boolean) -> Unit,
+  address: String,
+  onAddress: (String) -> Unit,
+  password: String,
+  onPassword: (String) -> Unit,
+  status: Status,
+  onStatus: (Status) -> Unit,
+  rememberMe: Boolean,
+  onRememberMe: (Boolean) -> Unit,
   onSubmit: () -> Unit,
 ) {
   val submit = KeyboardActions(onDone = { onSubmit() })

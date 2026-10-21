@@ -10,7 +10,7 @@ import kotlin.system.exitProcess
 private val logger = LoggerFactory.getLogger("team.elrant.bubbles.Main")
 
 /** `--help` text, also printed after a usage error. */
-private const val USAGE ="""Usage: bubbles [--x11 | --wayland]
+private const val USAGE = """Usage: bubbles [--x11 | --wayland]
 
   --x11      Run through X11 / Xwayland with GPU (OpenGL) rendering. Default.
   --wayland  Run as a native Wayland window. Renders on the CPU, since Compose can't use
@@ -42,13 +42,19 @@ private fun parseBackend(args: Array<String>): Backend {
     val choice = when (arg) {
       "--x11" -> Backend.X11
       "--wayland" -> Backend.Wayland
-      "--help", "-h" -> { println(USAGE); exitProcess(0) }
+      "--help", "-h" -> printHelpAndExit()
       else -> usageError("unknown option '$arg'")
     }
     if (backend != null && backend != choice) usageError("--x11 and --wayland are mutually exclusive")
     backend = choice
   }
   return backend ?: Backend.X11
+}
+
+/** Prints the usage to stdout, then exits with status 0. */
+private fun printHelpAndExit(): Nothing {
+  println(USAGE)
+  exitProcess(0)
 }
 
 /** Prints [message] and the usage to stderr, then exits with status 2. */
@@ -71,13 +77,16 @@ private fun configureBackend(requested: Backend): Backend {
   val backend = if (requested == Backend.Wayland && System.getenv("WAYLAND_DISPLAY") == null) {
     logger.warn("--wayland requested but WAYLAND_DISPLAY is not set; falling back to X11")
     Backend.X11
-  } else requested
+  } else {
+    requested
+  }
 
   when (backend) {
     Backend.X11 -> {
       System.setProperty("awt.toolkit.name", "XToolkit")
       logger.info("Using X11 backend")
     }
+
     Backend.Wayland -> {
       System.setProperty("awt.toolkit.name", "WLToolkit")
       System.setProperty("compose.swing.render.on.graphics", "true")

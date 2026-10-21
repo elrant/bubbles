@@ -55,12 +55,21 @@ fun StatusSelector(
               Text(status.label)
             }
           },
-          onClick = { expanded = false; onSelect(status) },
+          onClick = {
+            expanded = false
+            onSelect(status)
+          },
         )
       }
       if (onSignOut != null) {
         HorizontalDivider()
-        DropdownMenuItem(text = { Text("Sign out") }, onClick = { expanded = false; onSignOut() })
+        DropdownMenuItem(
+          text = { Text("Sign out") },
+          onClick = {
+            expanded = false
+            onSignOut()
+          },
+        )
       }
     }
   }
