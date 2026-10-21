@@ -1,6 +1,6 @@
 [versions]
 # serialization
-jackson             = "3.2.0"
+jackson             = "3.2.3"
 jackson-annotations = "2.22"
 jackson-bom         = "3.2.0"
 jackson-parent      = "2.22"
