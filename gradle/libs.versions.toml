@@ -6,7 +6,7 @@ jackson-bom         = "3.2.0"
 jackson-parent      = "2.22"
 
 # logging
-slf4j   = "2.0.17"
+slf4j   = "2.0.20"
 tinylog = "2.8.0-M1"
 
 # xmpp
