@@ -7,7 +7,7 @@ jackson-parent      = "2.22"
 
 # logging
 slf4j   = "2.0.17"
-tinylog = "2.8.0-M1"
+tinylog = "2.8.1"
 
 # xmpp
 jxmpp = "1.1.0"
