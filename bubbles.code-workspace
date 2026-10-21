@@ -1,0 +1,36 @@
+{
+    "folders": [
+        {
+            "path": "."
+        }
+    ],
+    "settings": {
+        "java.configuration.updateBuildConfiguration": "automatic",
+        "java.compile.nullAnalysis.mode": "automatic"
+    },
+    "extensions": {
+        "recommendations": [
+            "bierner.github-markdown-preview",
+            "bierner.markdown-checkbox",
+            "bierner.markdown-emoji",
+            "bierner.markdown-footnotes",
+            "bierner.markdown-preview-github-styles",
+            "davidanson.vscode-markdownlint",
+            "dotjoshjohnson.xml",
+            "editorconfig.editorconfig",
+            "esbenp.prettier-vscode",
+            "jetbrains.kotlin-server",
+            "mrmlnc.vscode-json5",
+            "ms-azuretools.vscode-containers",
+            "oderwat.indent-rainbow",
+            "redhat.java",
+            "redhat.vscode-xml",
+            "vscjava.vscode-gradle",
+            "vscjava.vscode-java-debug",
+            "vscjava.vscode-java-dependency",
+            "vscjava.vscode-java-pack",
+            "vscjava.vscode-java-test",
+            "vscjava.vscode-maven"
+        ]
+    }
+}
