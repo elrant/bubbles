@@ -17,7 +17,7 @@ bcprov = "1.84"
 
 # kotlin / compose
 kotlin = "2.3.0"
-compose = "1.10.0"
+compose = "1.12.2"
 coroutines = "1.10.2"
 shadow = "9.3.0"
 
