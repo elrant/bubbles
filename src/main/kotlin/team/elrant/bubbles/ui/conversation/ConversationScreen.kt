@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -38,26 +39,29 @@ import androidx.compose.ui.unit.dp
 import team.elrant.bubbles.Bubbles
 import team.elrant.bubbles.model.ChatMessage
 import team.elrant.bubbles.model.Contact
+import team.elrant.bubbles.ui.components.ContextMenuBox
 import team.elrant.bubbles.ui.components.DisplayPicture
+import team.elrant.bubbles.ui.components.MenuItem
 import team.elrant.bubbles.ui.components.StatusDot
+import team.elrant.bubbles.ui.components.copyToClipboard
 import team.elrant.bubbles.xmpp.ConnectedUser
 import java.time.Duration
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
-private val TIME = DateTimeFormatter.ofPattern("HH:mm")
+private val TIME_24H = DateTimeFormatter.ofPattern("HH:mm")
+private val TIME_12H = DateTimeFormatter.ofPattern("h:mm a")
 private val DATE = DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT)
-
-/** A new "X says:" run starts when the sender changes or after this much silence. */
-private val RUN_GAP = Duration.ofMinutes(5)
 
 /**
  * Conversation window contents: contact header, history, compose box and both display pictures.
- * Enter sends the draft, Shift+Enter inserts a newline.
+ * The send shortcut, message grouping and time format follow [Bubbles.settings].
  */
 @Composable
 fun ConversationScreen(bubbles: Bubbles, user: ConnectedUser, contact: Contact, modifier: Modifier = Modifier) {
   val messages = bubbles.history(contact.jid)
+  val settings = bubbles.preferences.settings
+  val time = if (settings.use24HourClock) TIME_24H else TIME_12H
   var draft by remember(contact.jid) { mutableStateOf("") }
 
   fun send() {
@@ -72,9 +76,16 @@ fun ConversationScreen(bubbles: Bubbles, user: ConnectedUser, contact: Contact, 
       Column(Modifier.weight(1f).fillMaxHeight()) {
         ContactHeader(contact)
         HorizontalDivider()
-        History(messages, selfName = user.username, contactName = contact.displayName, modifier = Modifier.weight(1f))
-        ComposeBox(draft, { draft = it }, onSend = ::send)
-        StatusBar(messages)
+        History(
+          messages,
+          selfName = user.username,
+          contactName = contact.displayName,
+          time = time,
+          runGap = Duration.ofMinutes(settings.runGapMinutes.toLong()),
+          modifier = Modifier.weight(1f),
+        )
+        ComposeBox(draft, { draft = it }, enterSends = settings.enterSends, onSend = ::send)
+        StatusBar(messages, time)
       }
       VerticalDivider()
       Column(
@@ -116,12 +127,17 @@ private fun ContactHeader(contact: Contact) {
   }
 }
 
-/** Messages grouped into "X says:" runs (see [RUN_GAP]); scrolls to the newest message as they arrive. */
+/**
+ * Messages grouped into "X says:" runs, each with its [time]; a run starts when the sender changes or after
+ * [runGap] of silence. Scrolls to the newest message as they arrive. Right-clicking a message offers to copy it.
+ */
 @Composable
 private fun History(
   messages: List<ChatMessage>,
   selfName: String,
   contactName: String,
+  time: DateTimeFormatter,
+  runGap: Duration,
   modifier: Modifier = Modifier,
 ) {
   val listState = rememberLazyListState()
@@ -134,32 +150,47 @@ private fun History(
       val previous = messages.getOrNull(index - 1)
       val startsRun = previous == null ||
         previous.outgoing != message.outgoing ||
-        Duration.between(previous.time, message.time) > RUN_GAP
+        Duration.between(previous.time, message.time) > runGap
+      val sender = if (message.outgoing) selfName else contactName
       Column {
         if (startsRun) {
           Row(Modifier.fillMaxWidth().padding(top = 8.dp)) {
             Text(
-              "${if (message.outgoing) selfName else contactName} says:",
+              "$sender says:",
               Modifier.weight(1f),
               style = MaterialTheme.typography.labelLarge,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-              message.time.format(TIME),
+              message.time.format(time),
               style = MaterialTheme.typography.labelSmall,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
           }
         }
-        Text(message.body, Modifier.padding(start = 16.dp, top = 2.dp))
+        ContextMenuBox(
+          menu = { close ->
+            MenuItem("Copy message", onClose = close, onClick = { copyToClipboard(message.body) })
+            MenuItem(
+              "Copy with sender and time",
+              onClose = close,
+              onClick = { copyToClipboard("[${message.time.format(time)}] $sender: ${message.body}") },
+            )
+          },
+        ) {
+          Text(message.body, Modifier.fillMaxWidth().padding(start = 16.dp, top = 2.dp))
+        }
       }
     }
   }
 }
 
-/** Draft editor and Send button. Enter calls [onSend], Shift+Enter inserts a newline. */
+/**
+ * Draft editor and Send button. With [enterSends], Enter calls [onSend] and Shift+Enter inserts a newline;
+ * otherwise Ctrl+Enter calls [onSend] and Enter inserts a newline.
+ */
 @Composable
-private fun ComposeBox(draft: String, onDraftChange: (String) -> Unit, onSend: () -> Unit) {
+private fun ComposeBox(draft: String, onDraftChange: (String) -> Unit, enterSends: Boolean, onSend: () -> Unit) {
   Row(
     Modifier.padding(8.dp),
     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -168,7 +199,7 @@ private fun ComposeBox(draft: String, onDraftChange: (String) -> Unit, onSend: (
     OutlinedTextField(
       draft, onDraftChange,
       Modifier.weight(1f).onPreviewKeyEvent {
-        val send = it.key == Key.Enter && !it.isShiftPressed
+        val send = it.key == Key.Enter && if (enterSends) !it.isShiftPressed else it.isCtrlPressed
         if (send && it.type == KeyEventType.KeyDown) onSend()
         send
       },
@@ -178,12 +209,12 @@ private fun ComposeBox(draft: String, onDraftChange: (String) -> Unit, onSend: (
   }
 }
 
-/** When the last incoming message arrived; hidden until there is one. */
+/** When the last incoming message arrived, formatted with [time]; hidden until there is one. */
 @Composable
-private fun StatusBar(messages: List<ChatMessage>) {
+private fun StatusBar(messages: List<ChatMessage>, time: DateTimeFormatter) {
   val last = messages.lastOrNull { !it.outgoing } ?: return
   Text(
-    "Last message received at ${last.time.format(TIME)} on ${last.time.format(DATE)}.",
+    "Last message received at ${last.time.format(time)} on ${last.time.format(DATE)}.",
     Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
     style = MaterialTheme.typography.labelSmall,
     color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -9,6 +9,7 @@ import team.elrant.bubbles.ui.components.ConfirmExitDialog
 import team.elrant.bubbles.ui.components.createWindow
 import team.elrant.bubbles.ui.contacts.ContactListScreen
 import team.elrant.bubbles.ui.conversation.ConversationScreen
+import team.elrant.bubbles.ui.settings.SettingsScreen
 import team.elrant.bubbles.ui.signin.SignInScreen
 import java.awt.Dimension
 import java.awt.Toolkit
@@ -25,18 +26,26 @@ private val CONVERSATION_WINDOW_MIN_SIZE = Dimension(480, 360)
 /**
  * Opens Messenger-style windows: one main window (sign-in, then the contact list) plus one window
  * per open conversation. The main window's composition owns the conversation windows, so the app
- * lives as long as the main window does. Call on the Swing thread.
+ * lives as long as the main window does. The settings replace the main window's contents while open.
+ * Call on the Swing thread.
  */
 fun showBubbles(bubbles: Bubbles) {
   val confirmExit = mutableStateOf(false)
+  val showSettings = mutableStateOf(false)
+  val openSettings = { showSettings.value = true }
   createWindow(
     title = "Bubbles",
     size = MAIN_WINDOW_SIZE,
     minimumSize = MAIN_WINDOW_MIN_SIZE,
+    settings = { bubbles.preferences.settings },
     onCloseRequest = { confirmExit.value = true },
   ) {
     val user = bubbles.user
-    if (user == null) SignInScreen(bubbles) else ContactListScreen(bubbles, user)
+    when {
+      showSettings.value -> SettingsScreen(bubbles, onBack = { showSettings.value = false })
+      user == null -> SignInScreen(bubbles, onOpenSettings = openSettings)
+      else -> ContactListScreen(bubbles, user, onOpenSettings = openSettings)
+    }
     if (confirmExit.value) {
       ConfirmExitDialog(onConfirm = { exitApplication(bubbles) }, onDismiss = { confirmExit.value = false })
     }
@@ -75,7 +84,9 @@ private fun ConversationWindows(bubbles: Bubbles) {
         title = "${contact.displayName} - Conversation",
         size = CONVERSATION_WINDOW_SIZE,
         minimumSize = CONVERSATION_WINDOW_MIN_SIZE,
+        settings = bubbles.preferences.settings,
         onCloseRequest = { bubbles.closeConversation(jid) },
+        attention = bubbles.incoming[jid] ?: 0,
       ) {
         ConversationScreen(bubbles, user, contact)
       }

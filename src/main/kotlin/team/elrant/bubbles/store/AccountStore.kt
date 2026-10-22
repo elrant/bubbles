@@ -15,7 +15,7 @@ import java.nio.file.Path
  *
  * @param file JSON file to use; defaults to `$XDG_CONFIG_HOME/bubbles/account.json`.
  */
-class AccountStore(private val file: Path = defaultFile()) {
+class AccountStore(private val file: Path = configFile("account.json")) {
   /** The remembered address, or `null` if none or the file is unreadable. */
   fun load(): String? = try {
     if (Files.exists(file)) MAPPER.readValue(file.toFile(), SavedAccount::class.java).address else null
@@ -48,12 +48,5 @@ class AccountStore(private val file: Path = defaultFile()) {
   companion object {
     private val logger = LoggerFactory.getLogger(AccountStore::class.java)
     private val MAPPER = ObjectMapper()
-
-    /** `account.json` under the XDG config directory, `~/.config` if `XDG_CONFIG_HOME` is unset. */
-    private fun defaultFile(): Path {
-      val configHome = System.getenv("XDG_CONFIG_HOME")?.takeIf { it.isNotBlank() }?.let(Path::of)
-        ?: Path.of(System.getProperty("user.home"), ".config")
-      return configHome.resolve("bubbles").resolve("account.json")
-    }
   }
 }

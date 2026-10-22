@@ -13,7 +13,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
-import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image
 import org.jivesoftware.smack.SmackException
 import org.jivesoftware.smack.XMPPException
@@ -23,8 +22,10 @@ import org.jxmpp.stringprep.XmppStringprepException
 import org.slf4j.LoggerFactory
 import team.elrant.bubbles.model.ChatMessage
 import team.elrant.bubbles.model.Contact
+import team.elrant.bubbles.model.Settings
 import team.elrant.bubbles.model.Status
 import team.elrant.bubbles.store.AccountStore
+import team.elrant.bubbles.store.SettingsStore
 import team.elrant.bubbles.xmpp.ConnectedUser
 import java.io.IOException
 
@@ -36,13 +37,14 @@ import java.io.IOException
  * are moved back to the main dispatcher before they touch state.
  *
  * @param accounts where the "Remember me" address is kept.
+ * @param settingsStore where the user's [Settings] are kept.
  */
-class Bubbles(private val accounts: AccountStore = AccountStore()) {
+class Bubbles(accounts: AccountStore = AccountStore(), settingsStore: SettingsStore = SettingsStore()) {
   private val logger = LoggerFactory.getLogger(Bubbles::class.java)
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
-  /** Address remembered from the last "Remember me" sign-in. */
-  val savedAddress: String? = accounts.load()
+  /** The settings and the "Remember me" address. */
+  val preferences = Preferences(accounts, settingsStore, scope)
 
   /** The signed-in account, or `null` while on the sign-in screen. */
   var user by mutableStateOf<ConnectedUser?>(null)
@@ -64,6 +66,17 @@ class Bubbles(private val accounts: AccountStore = AccountStore()) {
   val conversations: List<BareJid> get() = openConversations
   private val openConversations = mutableStateListOf<BareJid>()
   private val histories = mutableStateMapOf<BareJid, SnapshotStateList<ChatMessage>>()
+
+  /** Messages received per contact since their conversation was last opened; contacts without any are absent. */
+  val unread: Map<BareJid, Int> get() = unreadCounts
+  private val unreadCounts = mutableStateMapOf<BareJid, Int>()
+
+  /**
+   * Messages received per contact since sign-in; contacts without any are absent. A change means the
+   * conversation window should ask for attention (see [Settings.raiseOnMessage]).
+   */
+  val incoming: Map<BareJid, Int> get() = incomingCounts
+  private val incomingCounts = mutableStateMapOf<BareJid, Int>()
 
   private val avatars = mutableStateMapOf<BareJid, ImageBitmap>()
 
@@ -108,7 +121,7 @@ class Bubbles(private val accounts: AccountStore = AccountStore()) {
     )
     connect(connected, status)
 
-    withContext(Dispatchers.IO) { if (rememberMe) accounts.save(address) else accounts.clear() }
+    preferences.rememberAddress(address.takeIf { rememberMe })
     this.status = status
     personalMessage = ""
     user = connected
@@ -127,6 +140,8 @@ class Bubbles(private val accounts: AccountStore = AccountStore()) {
     contacts = emptyList()
     openConversations.clear()
     histories.clear()
+    unreadCounts.clear()
+    incomingCounts.clear()
     avatars.clear()
     requestedAvatars.clear()
     status = Status.Available
@@ -173,15 +188,15 @@ class Bubbles(private val accounts: AccountStore = AccountStore()) {
     }
   }
 
-  /** Sets our presence and broadcasts it. */
-  fun changeStatus(status: Status) {
+  /**
+   * Sets our presence and personal message and broadcasts both.
+   *
+   * @param status new presence; defaults to the current one.
+   * @param personalMessage new personal message, trimmed; defaults to the current one.
+   */
+  fun changePresence(status: Status = this.status, personalMessage: String = this.personalMessage) {
     this.status = status
-    publishPresence()
-  }
-
-  /** Sets our personal message (trimmed) and broadcasts it along with the current [status]. */
-  fun changePersonalMessage(message: String) {
-    personalMessage = message.trim()
+    this.personalMessage = personalMessage.trim()
     publishPresence()
   }
 
@@ -196,9 +211,30 @@ class Bubbles(private val accounts: AccountStore = AccountStore()) {
     }
   }
 
-  /** Opens a conversation window with [jid], unless one is already open. */
+  /**
+   * Moves [jid] from roster group [from] into roster group [to] on the server, in the background. Other groups
+   * of the contact are kept. A `null` [from] keeps all current groups (the contact was dragged out of a built-in
+   * group); a `null` [to] only removes [from], leaving the contact ungrouped if it was its only group. Failures
+   * are only logged; on success the roster push refreshes [contacts].
+   */
+  fun moveContact(jid: BareJid, from: String?, to: String?) {
+    val current = user ?: return
+    val groups = contact(jid).groups.filter { it != from }.let { if (to == null || to in it) it else it + to }
+    scope.launch {
+      try {
+        runInterruptible(Dispatchers.IO) { current.setGroups(jid, groups) }
+      } catch (e: SmackException) {
+        logger.error("Could not move {} to group {}: {}", jid, to, e.message)
+      } catch (e: XMPPException) {
+        logger.error("Server refused moving {} to group {}: {}", jid, to, e.message)
+      }
+    }
+  }
+
+  /** Opens a conversation window with [jid], unless one is already open, and marks its messages read. */
   fun openConversation(jid: BareJid) {
     if (jid !in openConversations) openConversations += jid
+    unreadCounts -= jid
     user?.let { requestAvatar(it, jid, contact(jid).avatarHash) }
   }
 
@@ -214,10 +250,18 @@ class Bubbles(private val accounts: AccountStore = AccountStore()) {
     scope.launch(Dispatchers.IO) { current.sendMessage(to, text) }
   }
 
-  /** Records an incoming message and pops up its conversation window. */
+  /**
+   * Records an incoming message. Its conversation window is popped up, or, if it is closed and
+   * [Settings.openOnMessage] is off, the contact is marked unread.
+   */
   private fun receive(from: BareJid, body: String) {
     mutableHistory(from) += ChatMessage(body, outgoing = false)
-    openConversation(from)
+    incomingCounts[from] = (incomingCounts[from] ?: 0) + 1
+    if (from in openConversations || preferences.settings.openOnMessage) {
+      openConversation(from)
+    } else {
+      unreadCounts[from] = (unreadCounts[from] ?: 0) + 1
+    }
   }
 
   /** Takes a fresh roster snapshot from [connected] and requests any new or changed avatars. */

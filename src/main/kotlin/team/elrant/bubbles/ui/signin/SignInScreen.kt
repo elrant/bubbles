@@ -47,14 +47,14 @@ import team.elrant.bubbles.ui.components.StatusSelector
 /**
  * Sign-in form, prefilled with the remembered address. While signing in it shows progress with a
  * Cancel button; errors are shown in a dialog. On success [Bubbles.user] is set, which swaps this
- * screen for the contact list.
+ * screen for the contact list. [onOpenSettings] is called by the Settings button.
  */
 @Composable
-fun SignInScreen(bubbles: Bubbles, modifier: Modifier = Modifier) {
-  var address by remember { mutableStateOf(bubbles.savedAddress.orEmpty()) }
+fun SignInScreen(bubbles: Bubbles, onOpenSettings: () -> Unit, modifier: Modifier = Modifier) {
+  var address by remember { mutableStateOf(bubbles.preferences.savedAddress.orEmpty()) }
   var password by remember { mutableStateOf("") }
   var status by remember { mutableStateOf(Status.Available) }
-  var rememberMe by remember { mutableStateOf(bubbles.savedAddress != null) }
+  var rememberMe by remember { mutableStateOf(bubbles.preferences.savedAddress != null) }
   var busy by remember { mutableStateOf(false) }
   var job by remember { mutableStateOf<Job?>(null) }
   var error by remember { mutableStateOf<String?>(null) }
@@ -102,6 +102,8 @@ fun SignInScreen(bubbles: Bubbles, modifier: Modifier = Modifier) {
           rememberMe = rememberMe, onRememberMe = { rememberMe = it },
           onSubmit = ::signIn,
         )
+        Spacer(Modifier.height(8.dp))
+        TextButton(onClick = onOpenSettings) { Text("Settings") }
       }
     }
   }

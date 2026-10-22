@@ -139,6 +139,22 @@ class ConnectedUser(
     conn.sendStanza(presence.build())
   }
 
+  /**
+   * Replaces the roster groups of [contact] with [groups] (empty: no group), keeping its nickname. Blocking.
+   * Does nothing if [contact] isn't in the roster or before [initializeConnection]. Throws if the request fails.
+   */
+  fun setGroups(contact: BareJid, groups: List<String>) {
+    val roster = roster ?: return
+    val entry = roster.getEntry(contact)
+    if (entry == null) {
+      logger.warn("Cannot change the groups of {}: not in the roster", contact)
+      return
+    }
+    // A roster set for an existing item updates it. Unlike createItemAndRequestSubscription, this
+    // sends no subscription request.
+    roster.createItem(contact, entry.name, groups.toTypedArray())
+  }
+
   /** Sends [message] to [contact] (user@service.name). Blocking. Failures are logged, not thrown. */
   fun sendMessage(contact: BareJid, message: String) {
     try {
