@@ -171,7 +171,7 @@ val Status.color: Color
  * root in it.
  */
 @Composable
-fun BubblesTheme(flavor: Flavor, accent: Accent, content: @Composable () -> Unit) {
+fun bubblesTheme(flavor: Flavor, accent: Accent, content: @Composable () -> Unit) {
   val scheme = remember(flavor, accent) { colorScheme(flavor, accent) }
   MaterialTheme(colorScheme = scheme, content = content)
 }

@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.round
  * @param content the area that reacts to right-clicks.
  */
 @Composable
-fun ContextMenuBox(
+fun contextMenuBox(
   menu: @Composable ColumnScope.(close: () -> Unit) -> Unit,
   modifier: Modifier = Modifier,
   content: @Composable () -> Unit,

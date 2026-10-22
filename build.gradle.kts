@@ -34,7 +34,8 @@ dependencies {
 // JBR 25 installed where Gradle can detect it.
 val jbr: Action<JavaToolchainSpec> = Action {
   languageVersion = JavaLanguageVersion.of(25)
-  vendor = JvmVendorSpec.JETBRAINS
+  // `matching` is stable API; the JETBRAINS constant is @Incubating. Matches java.vendor "JetBrains s.r.o.".
+  vendor = JvmVendorSpec.matching("JetBrains")
 }
 
 kotlin {

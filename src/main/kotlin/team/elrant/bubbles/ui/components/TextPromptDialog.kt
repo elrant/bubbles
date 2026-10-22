@@ -27,7 +27,7 @@ import androidx.compose.ui.input.key.type
  * @param onDismiss called on Cancel or when the dialog is dismissed.
  */
 @Composable
-fun TextPromptDialog(
+fun textPromptDialog(
   title: String,
   label: String,
   confirmText: String,

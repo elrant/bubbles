@@ -40,9 +40,9 @@ import kotlinx.coroutines.launch
 import team.elrant.bubbles.Bubbles
 import team.elrant.bubbles.SignInException
 import team.elrant.bubbles.model.Status
-import team.elrant.bubbles.ui.components.DisplayPicture
-import team.elrant.bubbles.ui.components.StatusDot
-import team.elrant.bubbles.ui.components.StatusSelector
+import team.elrant.bubbles.ui.components.displayPicture
+import team.elrant.bubbles.ui.components.statusDot
+import team.elrant.bubbles.ui.components.statusSelector
 
 /**
  * Sign-in form, prefilled with the remembered address. While signing in it shows progress with a
@@ -50,7 +50,7 @@ import team.elrant.bubbles.ui.components.StatusSelector
  * screen for the contact list. [onOpenSettings] is called by the Settings button.
  */
 @Composable
-fun SignInScreen(bubbles: Bubbles, onOpenSettings: () -> Unit, modifier: Modifier = Modifier) {
+fun signInScreen(bubbles: Bubbles, onOpenSettings: () -> Unit, modifier: Modifier = Modifier) {
   var address by remember { mutableStateOf(bubbles.preferences.savedAddress.orEmpty()) }
   var password by remember { mutableStateOf("") }
   var status by remember { mutableStateOf(Status.Available) }
@@ -85,7 +85,7 @@ fun SignInScreen(bubbles: Bubbles, onOpenSettings: () -> Unit, modifier: Modifie
     ) {
       Text("Bubbles", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
       Spacer(Modifier.height(20.dp))
-      DisplayPicture(address.ifBlank { "?" }, status, 112.dp)
+      displayPicture(address.ifBlank { "?" }, status, 112.dp)
       Spacer(Modifier.height(24.dp))
 
       if (busy) {
@@ -95,7 +95,7 @@ fun SignInScreen(bubbles: Bubbles, onOpenSettings: () -> Unit, modifier: Modifie
         Spacer(Modifier.height(16.dp))
         OutlinedButton(onClick = { job?.cancel() }) { Text("Cancel") }
       } else {
-        SignInForm(
+        signInForm(
           address = address, onAddress = { address = it },
           password = password, onPassword = { password = it },
           status = status, onStatus = { status = it },
@@ -120,7 +120,7 @@ fun SignInScreen(bubbles: Bubbles, onOpenSettings: () -> Unit, modifier: Modifie
 
 /** Stateless address/password/status/"Remember me" fields; Enter in either text field submits. */
 @Composable
-private fun SignInForm(
+private fun signInForm(
   address: String,
   onAddress: (String) -> Unit,
   password: String,
@@ -147,8 +147,8 @@ private fun SignInForm(
     Row(verticalAlignment = Alignment.CenterVertically) {
       Text("Sign in as:", color = MaterialTheme.colorScheme.onSurfaceVariant)
       Spacer(Modifier.width(4.dp))
-      StatusSelector(onSelect = onStatus) {
-        StatusDot(status)
+      statusSelector(onSelect = onStatus) {
+        statusDot(status)
         Spacer(Modifier.width(6.dp))
         Text(status.label)
       }

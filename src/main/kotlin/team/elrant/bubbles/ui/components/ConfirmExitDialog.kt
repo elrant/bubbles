@@ -7,7 +7,7 @@ import androidx.compose.runtime.Composable
 
 /** Yes/No prompt shown before quitting from the main window. */
 @Composable
-fun ConfirmExitDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+fun confirmExitDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
   AlertDialog(
     onDismissRequest = onDismiss,
     title = { Text("Bubbles") },

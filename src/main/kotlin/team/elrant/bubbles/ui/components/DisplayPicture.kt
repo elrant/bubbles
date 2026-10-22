@@ -40,7 +40,7 @@ private const val INITIALS_SIZE = 0.34f
  * @param picture avatar image, cropped to fill the frame.
  */
 @Composable
-fun DisplayPicture(
+fun displayPicture(
   name: String,
   status: Status,
   size: Dp,
@@ -78,7 +78,7 @@ fun DisplayPicture(
 
 /** Small circle in the presence colour of [status]. */
 @Composable
-fun StatusDot(status: Status, modifier: Modifier = Modifier, size: Dp = 10.dp) {
+fun statusDot(status: Status, modifier: Modifier = Modifier, size: Dp = 10.dp) {
   Box(modifier.size(size).clip(CircleShape).background(status.color))
 }
 

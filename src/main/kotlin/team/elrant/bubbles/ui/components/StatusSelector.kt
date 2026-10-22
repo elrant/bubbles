@@ -2,7 +2,7 @@ package team.elrant.bubbles.ui.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
@@ -28,7 +28,7 @@ import team.elrant.bubbles.model.Status
  * When [onOpenSettings] or [onSignOut] is given, the menu also offers "Settings…" or "Sign out".
  */
 @Composable
-fun StatusSelector(
+fun statusSelector(
   onSelect: (Status) -> Unit,
   modifier: Modifier = Modifier,
   onOpenSettings: (() -> Unit)? = null,
@@ -48,7 +48,7 @@ fun StatusSelector(
       Text(" ▾")
     }
     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-      StatusMenuItems(
+      statusMenuItems(
         onSelect = onSelect,
         onClose = { expanded = false },
         onOpenSettings = onOpenSettings,
@@ -59,39 +59,43 @@ fun StatusSelector(
 }
 
 /**
- * The status menu's items, for use inside a [DropdownMenu] or [ContextMenuBox]: one per selectable status,
+ * The status menu's items, for use inside a [DropdownMenu] or [contextMenuBox]: one per selectable status,
  * then "Settings…" and "Sign out" when given. Every item calls [onClose] before its action.
  */
 @Composable
-internal fun ColumnScope.StatusMenuItems(
+internal fun statusMenuItems(
   onSelect: (Status) -> Unit,
   onClose: () -> Unit,
+  modifier: Modifier = Modifier,
   onOpenSettings: (() -> Unit)? = null,
   onSignOut: (() -> Unit)? = null,
 ) {
-  for (status in Status.selectable) {
-    DropdownMenuItem(
-      text = {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-          StatusDot(status)
-          Spacer(Modifier.width(8.dp))
-          Text(status.label)
-        }
-      },
-      onClick = {
-        onClose()
-        onSelect(status)
-      },
-    )
+  // One Column so the items are a single emitter, whatever menu they're placed in.
+  Column(modifier) {
+    for (status in Status.selectable) {
+      DropdownMenuItem(
+        text = {
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            statusDot(status)
+            Spacer(Modifier.width(8.dp))
+            Text(status.label)
+          }
+        },
+        onClick = {
+          onClose()
+          onSelect(status)
+        },
+      )
+    }
+    if (onOpenSettings != null || onSignOut != null) HorizontalDivider()
+    if (onOpenSettings != null) menuItem("Settings…", onClose, onClick = onOpenSettings)
+    if (onSignOut != null) menuItem("Sign out", onClose, onClick = onSignOut)
   }
-  if (onOpenSettings != null || onSignOut != null) HorizontalDivider()
-  if (onOpenSettings != null) MenuItem("Settings…", onClose, onClick = onOpenSettings)
-  if (onSignOut != null) MenuItem("Sign out", onClose, onClick = onSignOut)
 }
 
 /** A plain-text [DropdownMenuItem] that calls [onClose], then [onClick]. */
 @Composable
-fun MenuItem(text: String, onClose: () -> Unit, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun menuItem(text: String, onClose: () -> Unit, onClick: () -> Unit, modifier: Modifier = Modifier) {
   DropdownMenuItem(
     text = { Text(text) },
     onClick = {

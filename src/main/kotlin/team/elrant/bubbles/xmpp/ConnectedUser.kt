@@ -228,10 +228,11 @@ class ConnectedUser(
      * `null` if the presence doesn't say. Unavailable presences and clients without XEP-0153 don't
      * say, which must not be mistaken for a changed photo.
      */
-    private fun Presence.avatarHash(): String? =
-      (getExtensionElement("x", "vcard-temp:x:update") as? StandardExtensionElement)
-        ?.getFirstElement("photo")
-        ?.let { it.text.orEmpty().trim() }
+    private fun Presence.avatarHash(): String? {
+      val update = getExtensionElement("x", "vcard-temp:x:update") as? StandardExtensionElement
+      val photo = update?.getFirstElement("photo") ?: return null
+      return photo.text.orEmpty().trim()
+    }
 
     /** Verifies [hostname] against the peer certificate's SAN/CN without relying on the SSLSession peer host. */
     private fun verifyCertHostname(hostname: String, session: SSLSession): Boolean = try {

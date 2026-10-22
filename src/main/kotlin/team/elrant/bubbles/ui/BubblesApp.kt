@@ -4,13 +4,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import team.elrant.bubbles.Bubbles
-import team.elrant.bubbles.ui.components.BubblesWindow
-import team.elrant.bubbles.ui.components.ConfirmExitDialog
+import team.elrant.bubbles.ui.components.bubblesWindow
+import team.elrant.bubbles.ui.components.confirmExitDialog
 import team.elrant.bubbles.ui.components.createWindow
-import team.elrant.bubbles.ui.contacts.ContactListScreen
-import team.elrant.bubbles.ui.conversation.ConversationScreen
-import team.elrant.bubbles.ui.settings.SettingsScreen
-import team.elrant.bubbles.ui.signin.SignInScreen
+import team.elrant.bubbles.ui.contacts.contactListScreen
+import team.elrant.bubbles.ui.conversation.conversationScreen
+import team.elrant.bubbles.ui.settings.settingsScreen
+import team.elrant.bubbles.ui.signin.signInScreen
 import java.awt.Dimension
 import java.awt.Toolkit
 import java.awt.Window
@@ -42,14 +42,14 @@ fun showBubbles(bubbles: Bubbles) {
   ) {
     val user = bubbles.user
     when {
-      showSettings.value -> SettingsScreen(bubbles, onBack = { showSettings.value = false })
-      user == null -> SignInScreen(bubbles, onOpenSettings = openSettings)
-      else -> ContactListScreen(bubbles, user, onOpenSettings = openSettings)
+      showSettings.value -> settingsScreen(bubbles, onBack = { showSettings.value = false })
+      user == null -> signInScreen(bubbles, onOpenSettings = openSettings)
+      else -> contactListScreen(bubbles, user, onOpenSettings = openSettings)
     }
     if (confirmExit.value) {
-      ConfirmExitDialog(onConfirm = { exitApplication(bubbles) }, onDismiss = { confirmExit.value = false })
+      confirmExitDialog(onConfirm = { exitApplication(bubbles) }, onDismiss = { confirmExit.value = false })
     }
-    ConversationWindows(bubbles)
+    conversationWindows(bubbles)
   }.isVisible = true
 }
 
@@ -75,12 +75,12 @@ fun exitApplication(bubbles: Bubbles) {
 
 /** One window per [Bubbles.conversations] entry; closing a window closes its conversation. */
 @Composable
-private fun ConversationWindows(bubbles: Bubbles) {
+private fun conversationWindows(bubbles: Bubbles) {
   val user = bubbles.user ?: return
   for (jid in bubbles.conversations) {
     key(jid) {
       val contact = bubbles.contact(jid)
-      BubblesWindow(
+      bubblesWindow(
         title = "${contact.displayName} - Conversation",
         size = CONVERSATION_WINDOW_SIZE,
         minimumSize = CONVERSATION_WINDOW_MIN_SIZE,
@@ -88,7 +88,7 @@ private fun ConversationWindows(bubbles: Bubbles) {
         onCloseRequest = { bubbles.closeConversation(jid) },
         attention = bubbles.incoming[jid] ?: 0,
       ) {
-        ConversationScreen(bubbles, user, contact)
+        conversationScreen(bubbles, user, contact)
       }
     }
   }

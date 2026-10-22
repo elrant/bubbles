@@ -66,7 +66,7 @@ class ContactDragState {
   var pointer by mutableStateOf(Offset.Zero)
     private set
 
-  /** Where the drag overlay starts; see [DragGhost]. */
+  /** Where the drag overlay starts; see [dragGhost]. */
   internal var overlayOrigin = Offset.Zero
 
   /** Bounds of each visible row, by row key, with the group it belongs to. */
@@ -144,13 +144,13 @@ fun Modifier.dragRow(
   }
 }
 
-/** Marks where the drag overlay starts; apply to the box that holds both the list and its [DragGhost]. */
+/** Marks where the drag overlay starts; apply to the box that holds both the list and its [dragGhost]. */
 fun Modifier.dragOverlay(state: ContactDragState): Modifier =
   onGloballyPositioned { state.overlayOrigin = it.positionInRoot() }
 
 /** The label of the dragged item next to the pointer; nothing while not dragging. */
 @Composable
-fun DragGhost(state: ContactDragState, modifier: Modifier = Modifier) {
+fun dragGhost(state: ContactDragState, modifier: Modifier = Modifier) {
   val item = state.dragged ?: return
   Surface(
     modifier.offset { (state.pointer - state.overlayOrigin + GHOST_OFFSET).round() },

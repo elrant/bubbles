@@ -10,7 +10,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.awt.ComposePanel
 import org.slf4j.LoggerFactory
 import team.elrant.bubbles.model.Settings
-import team.elrant.bubbles.ui.theme.BubblesTheme
+import team.elrant.bubbles.ui.theme.bubblesTheme
 import java.awt.Dimension
 import java.awt.Taskbar
 import java.awt.Window
@@ -52,7 +52,7 @@ fun createWindow(
     ComposePanel().apply {
       setContent {
         val current = settings()
-        BubblesTheme(current.flavor, current.accent, content)
+        bubblesTheme(current.flavor, current.accent, content)
       }
     },
   )
@@ -77,7 +77,7 @@ fun createWindow(
  * @param content the window's contents.
  */
 @Composable
-fun BubblesWindow(
+fun bubblesWindow(
   title: String,
   size: Dimension,
   minimumSize: Dimension,

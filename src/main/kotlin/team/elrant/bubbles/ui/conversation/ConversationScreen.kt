@@ -39,11 +39,11 @@ import androidx.compose.ui.unit.dp
 import team.elrant.bubbles.Bubbles
 import team.elrant.bubbles.model.ChatMessage
 import team.elrant.bubbles.model.Contact
-import team.elrant.bubbles.ui.components.ContextMenuBox
-import team.elrant.bubbles.ui.components.DisplayPicture
-import team.elrant.bubbles.ui.components.MenuItem
-import team.elrant.bubbles.ui.components.StatusDot
+import team.elrant.bubbles.ui.components.contextMenuBox
 import team.elrant.bubbles.ui.components.copyToClipboard
+import team.elrant.bubbles.ui.components.displayPicture
+import team.elrant.bubbles.ui.components.menuItem
+import team.elrant.bubbles.ui.components.statusDot
 import team.elrant.bubbles.xmpp.ConnectedUser
 import java.time.Duration
 import java.time.format.DateTimeFormatter
@@ -58,7 +58,7 @@ private val DATE = DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT)
  * The send shortcut, message grouping and time format follow [Bubbles.settings].
  */
 @Composable
-fun ConversationScreen(bubbles: Bubbles, user: ConnectedUser, contact: Contact, modifier: Modifier = Modifier) {
+fun conversationScreen(bubbles: Bubbles, user: ConnectedUser, contact: Contact, modifier: Modifier = Modifier) {
   val messages = bubbles.history(contact.jid)
   val settings = bubbles.preferences.settings
   val time = if (settings.use24HourClock) TIME_24H else TIME_12H
@@ -74,9 +74,9 @@ fun ConversationScreen(bubbles: Bubbles, user: ConnectedUser, contact: Contact, 
   Surface(modifier.fillMaxSize()) {
     Row {
       Column(Modifier.weight(1f).fillMaxHeight()) {
-        ContactHeader(contact)
+        contactHeader(contact)
         HorizontalDivider()
-        History(
+        history(
           messages,
           selfName = user.username,
           contactName = contact.displayName,
@@ -84,17 +84,17 @@ fun ConversationScreen(bubbles: Bubbles, user: ConnectedUser, contact: Contact, 
           runGap = Duration.ofMinutes(settings.runGapMinutes.toLong()),
           modifier = Modifier.weight(1f),
         )
-        ComposeBox(draft, { draft = it }, enterSends = settings.enterSends, onSend = ::send)
-        StatusBar(messages, time)
+        composeBox(draft, { draft = it }, enterSends = settings.enterSends, onSend = ::send)
+        statusBar(messages, time)
       }
       VerticalDivider()
       Column(
         Modifier.width(128.dp).fillMaxHeight().padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
       ) {
-        DisplayPicture(contact.displayName, contact.status, 104.dp, picture = bubbles.avatar(contact.jid))
+        displayPicture(contact.displayName, contact.status, 104.dp, picture = bubbles.avatar(contact.jid))
         Spacer(Modifier.weight(1f))
-        DisplayPicture(user.username, bubbles.status, 104.dp, picture = bubbles.avatar(user.jid))
+        displayPicture(user.username, bubbles.status, 104.dp, picture = bubbles.avatar(user.jid))
       }
     }
   }
@@ -102,7 +102,7 @@ fun ConversationScreen(bubbles: Bubbles, user: ConnectedUser, contact: Contact, 
 
 /** The contact's name, status, personal message and JID. */
 @Composable
-private fun ContactHeader(contact: Contact) {
+private fun contactHeader(contact: Contact) {
   Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
     Text(
       contact.displayName,
@@ -110,7 +110,7 @@ private fun ContactHeader(contact: Contact) {
       maxLines = 1, overflow = TextOverflow.Ellipsis,
     )
     Row(verticalAlignment = Alignment.CenterVertically) {
-      StatusDot(contact.status, size = 8.dp)
+      statusDot(contact.status, size = 8.dp)
       Spacer(Modifier.width(6.dp))
       Text(
         listOfNotNull(contact.status.label, contact.personalMessage).joinToString(" - "),
@@ -132,7 +132,7 @@ private fun ContactHeader(contact: Contact) {
  * [runGap] of silence. Scrolls to the newest message as they arrive. Right-clicking a message offers to copy it.
  */
 @Composable
-private fun History(
+private fun history(
   messages: List<ChatMessage>,
   selfName: String,
   contactName: String,
@@ -168,10 +168,10 @@ private fun History(
             )
           }
         }
-        ContextMenuBox(
+        contextMenuBox(
           menu = { close ->
-            MenuItem("Copy message", onClose = close, onClick = { copyToClipboard(message.body) })
-            MenuItem(
+            menuItem("Copy message", onClose = close, onClick = { copyToClipboard(message.body) })
+            menuItem(
               "Copy with sender and time",
               onClose = close,
               onClick = { copyToClipboard("[${message.time.format(time)}] $sender: ${message.body}") },
@@ -190,7 +190,7 @@ private fun History(
  * otherwise Ctrl+Enter calls [onSend] and Enter inserts a newline.
  */
 @Composable
-private fun ComposeBox(draft: String, onDraftChange: (String) -> Unit, enterSends: Boolean, onSend: () -> Unit) {
+private fun composeBox(draft: String, onDraftChange: (String) -> Unit, enterSends: Boolean, onSend: () -> Unit) {
   Row(
     Modifier.padding(8.dp),
     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -211,7 +211,7 @@ private fun ComposeBox(draft: String, onDraftChange: (String) -> Unit, enterSend
 
 /** When the last incoming message arrived, formatted with [time]; hidden until there is one. */
 @Composable
-private fun StatusBar(messages: List<ChatMessage>, time: DateTimeFormatter) {
+private fun statusBar(messages: List<ChatMessage>, time: DateTimeFormatter) {
   val last = messages.lastOrNull { !it.outgoing } ?: return
   Text(
     "Last message received at ${last.time.format(time)} on ${last.time.format(DATE)}.",

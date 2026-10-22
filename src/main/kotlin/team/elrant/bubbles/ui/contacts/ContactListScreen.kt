@@ -45,13 +45,13 @@ import team.elrant.bubbles.Bubbles
 import team.elrant.bubbles.model.Contact
 import team.elrant.bubbles.model.ContactGroup
 import team.elrant.bubbles.model.groupContacts
-import team.elrant.bubbles.ui.components.ContextMenuBox
-import team.elrant.bubbles.ui.components.DisplayPicture
-import team.elrant.bubbles.ui.components.MenuItem
-import team.elrant.bubbles.ui.components.StatusMenuItems
-import team.elrant.bubbles.ui.components.StatusSelector
-import team.elrant.bubbles.ui.components.TextPromptDialog
+import team.elrant.bubbles.ui.components.contextMenuBox
 import team.elrant.bubbles.ui.components.copyToClipboard
+import team.elrant.bubbles.ui.components.displayPicture
+import team.elrant.bubbles.ui.components.menuItem
+import team.elrant.bubbles.ui.components.statusMenuItems
+import team.elrant.bubbles.ui.components.statusSelector
+import team.elrant.bubbles.ui.components.textPromptDialog
 import team.elrant.bubbles.xmpp.ConnectedUser
 
 /**
@@ -59,7 +59,7 @@ import team.elrant.bubbles.xmpp.ConnectedUser
  * [onOpenSettings] is offered in the profile header's menus.
  */
 @Composable
-fun ContactListScreen(
+fun contactListScreen(
   bubbles: Bubbles,
   user: ConnectedUser,
   onOpenSettings: () -> Unit,
@@ -68,14 +68,14 @@ fun ContactListScreen(
   var query by remember { mutableStateOf("") }
   Surface(modifier.fillMaxSize()) {
     Column {
-      SelfHeader(bubbles, user, onOpenSettings)
+      selfHeader(bubbles, user, onOpenSettings)
       OutlinedTextField(
         query, { query = it },
         Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
         placeholder = { Text("Search contacts…") }, singleLine = true,
       )
       HorizontalDivider()
-      ContactList(
+      contactList(
         bubbles,
         groupContacts(bubbles.contacts, query, bubbles.preferences.settings.groupOrder),
         emptyText = if (query.isBlank()) "No contacts yet" else "No matches",
@@ -89,13 +89,13 @@ fun ContactListScreen(
  * status menu plus "Edit personal message".
  */
 @Composable
-private fun SelfHeader(bubbles: Bubbles, user: ConnectedUser, onOpenSettings: () -> Unit) {
+private fun selfHeader(bubbles: Bubbles, user: ConnectedUser, onOpenSettings: () -> Unit) {
   val editMessage = remember { FocusRequester() }
-  ContextMenuBox(
+  contextMenuBox(
     menu = { close ->
-      MenuItem("Edit personal message", onClose = close, onClick = { editMessage.requestFocus() })
+      menuItem("Edit personal message", onClose = close, onClick = { editMessage.requestFocus() })
       HorizontalDivider()
-      StatusMenuItems(
+      statusMenuItems(
         onSelect = { bubbles.changePresence(status = it) },
         onClose = close,
         onOpenSettings = onOpenSettings,
@@ -105,10 +105,10 @@ private fun SelfHeader(bubbles: Bubbles, user: ConnectedUser, onOpenSettings: ()
   ) {
     Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
       Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        DisplayPicture(user.username, bubbles.status, 64.dp, picture = bubbles.avatar(user.jid))
+        displayPicture(user.username, bubbles.status, 64.dp, picture = bubbles.avatar(user.jid))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-          StatusSelector(
+          statusSelector(
             onSelect = { bubbles.changePresence(status = it) },
             onOpenSettings = onOpenSettings,
             onSignOut = bubbles::signOut,
@@ -119,7 +119,7 @@ private fun SelfHeader(bubbles: Bubbles, user: ConnectedUser, onOpenSettings: ()
               maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
           }
-          PersonalMessageField(
+          personalMessageField(
             bubbles.personalMessage,
             { bubbles.changePresence(personalMessage = it) },
             Modifier.padding(start = 4.dp, top = 2.dp).focusRequester(editMessage),
@@ -135,7 +135,7 @@ private fun SelfHeader(bubbles: Bubbles, user: ConnectedUser, onOpenSettings: ()
  * when the field loses focus (Enter clears focus), and only if the text changed.
  */
 @Composable
-private fun PersonalMessageField(current: String, onCommit: (String) -> Unit, modifier: Modifier = Modifier) {
+private fun personalMessageField(current: String, onCommit: (String) -> Unit, modifier: Modifier = Modifier) {
   var draft by remember(current) { mutableStateOf(current) }
   val focus = LocalFocusManager.current
   val style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -167,7 +167,7 @@ private fun PersonalMessageField(current: String, onCommit: (String) -> Unit, mo
  * them (see [onDrop]). Shows [emptyText] when there are no groups.
  */
 @Composable
-private fun ContactList(bubbles: Bubbles, groups: List<ContactGroup>, emptyText: String) {
+private fun contactList(bubbles: Bubbles, groups: List<ContactGroup>, emptyText: String) {
   val collapsed = remember { mutableStateMapOf<String, Boolean>() }
   var selected by remember { mutableStateOf<BareJid?>(null) }
   var newGroupFor by remember { mutableStateOf<DragItem.ContactItem?>(null) }
@@ -187,7 +187,7 @@ private fun ContactList(bubbles: Bubbles, groups: List<ContactGroup>, emptyText:
         val name = group.name
         val isCollapsed = collapsed[name] == true
         item(key = groupKey(name)) {
-          GroupHeaderEntry(
+          groupHeaderEntry(
             group, isCollapsed, drag, drop,
             onToggle = { collapsed[name] = !isCollapsed },
             onCollapseAll = { collapse -> groups.forEach { collapsed[it.name] = collapse } },
@@ -195,7 +195,7 @@ private fun ContactList(bubbles: Bubbles, groups: List<ContactGroup>, emptyText:
         }
         if (!isCollapsed) {
           items(group.contacts, key = { contactKey(name, it.jid) }) { contact ->
-            ContactEntry(
+            contactEntry(
               bubbles, contact, group, drag, drop,
               selected = contact.jid == selected,
               onSelect = { selected = contact.jid },
@@ -205,11 +205,11 @@ private fun ContactList(bubbles: Bubbles, groups: List<ContactGroup>, emptyText:
         }
       }
     }
-    DragGhost(drag)
+    dragGhost(drag)
   }
 
   newGroupFor?.let { item ->
-    TextPromptDialog(
+    textPromptDialog(
       title = "New group",
       label = "Move ${item.contact.displayName} to the group",
       confirmText = "Create",
@@ -227,7 +227,7 @@ private fun ContactList(bubbles: Bubbles, groups: List<ContactGroup>, emptyText:
  * for "Collapse all" / "Expand all" ([onCollapseAll] with `true` / `false`).
  */
 @Composable
-private fun GroupHeaderEntry(
+private fun groupHeaderEntry(
   group: ContactGroup,
   collapsed: Boolean,
   drag: ContactDragState,
@@ -237,13 +237,13 @@ private fun GroupHeaderEntry(
 ) {
   val key = groupKey(group.name)
   DisposableEffect(key) { onDispose { drag.forget(key) } }
-  ContextMenuBox(
+  contextMenuBox(
     menu = { close ->
-      MenuItem("Collapse all", onClose = close, onClick = { onCollapseAll(true) })
-      MenuItem("Expand all", onClose = close, onClick = { onCollapseAll(false) })
+      menuItem("Collapse all", onClose = close, onClick = { onCollapseAll(true) })
+      menuItem("Expand all", onClose = close, onClick = { onCollapseAll(false) })
     },
   ) {
-    GroupHeader(
+    groupHeader(
       group,
       collapsed,
       highlighted = drag.target?.name == group.name && canDrop(drag.dragged, drag.target),
@@ -259,7 +259,7 @@ private fun GroupHeaderEntry(
  * to another group, right-click opens its menu ("New group…" calls [onNewGroup]).
  */
 @Composable
-private fun ContactEntry(
+private fun contactEntry(
   bubbles: Bubbles,
   contact: Contact,
   group: ContactGroup,
@@ -271,15 +271,15 @@ private fun ContactEntry(
 ) {
   val key = contactKey(group.name, contact.jid)
   DisposableEffect(key) { onDispose { drag.forget(key) } }
-  ContextMenuBox(
+  contextMenuBox(
     menu = { close ->
-      MenuItem("Open conversation", onClose = close, onClick = { bubbles.openConversation(contact.jid) })
-      MenuItem("Copy address", onClose = close, onClick = { copyToClipboard(contact.jid.toString()) })
+      menuItem("Open conversation", onClose = close, onClick = { bubbles.openConversation(contact.jid) })
+      menuItem("Copy address", onClose = close, onClick = { copyToClipboard(contact.jid.toString()) })
       HorizontalDivider()
-      MenuItem("New group…", onClose = close, onClick = onNewGroup)
+      menuItem("New group…", onClose = close, onClick = onNewGroup)
     },
   ) {
-    ContactRow(
+    contactRow(
       contact,
       picture = bubbles.avatar(contact.jid),
       unread = bubbles.unread[contact.jid] ?: 0,
@@ -348,7 +348,7 @@ private fun rosterGroupOrder(bubbles: Bubbles): List<String> {
 
 /** A group's heading with its member count; [highlighted] while something can be dropped on it. */
 @Composable
-private fun GroupHeader(group: ContactGroup, collapsed: Boolean, highlighted: Boolean, modifier: Modifier = Modifier) {
+private fun groupHeader(group: ContactGroup, collapsed: Boolean, highlighted: Boolean, modifier: Modifier = Modifier) {
   Text(
     "${if (collapsed) "▸" else "▾"} ${group.name} (${group.contacts.size})",
     modifier
@@ -362,7 +362,7 @@ private fun GroupHeader(group: ContactGroup, collapsed: Boolean, highlighted: Bo
 
 /** Display picture, name and personal message of one contact; [unread] messages are counted after the name. */
 @Composable
-private fun ContactRow(
+private fun contactRow(
   contact: Contact,
   picture: ImageBitmap?,
   unread: Int,
@@ -376,7 +376,7 @@ private fun ContactRow(
       .padding(start = 24.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    DisplayPicture(contact.displayName, contact.status, 32.dp, picture = picture)
+    displayPicture(contact.displayName, contact.status, 32.dp, picture = picture)
     Spacer(Modifier.width(10.dp))
     Text(
       if (unread > 0) "${contact.displayName} ($unread)" else contact.displayName,

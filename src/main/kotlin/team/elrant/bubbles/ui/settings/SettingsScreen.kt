@@ -54,27 +54,27 @@ import team.elrant.bubbles.ui.theme.accentColor
  * @param modifier applied to the screen.
  */
 @Composable
-fun SettingsScreen(bubbles: Bubbles, onBack: () -> Unit, modifier: Modifier = Modifier) {
+fun settingsScreen(bubbles: Bubbles, onBack: () -> Unit, modifier: Modifier = Modifier) {
   val settings = bubbles.preferences.settings
   val update = bubbles.preferences::update
   Surface(modifier.fillMaxSize()) {
     Column {
-      TopBar(onBack)
+      topBar(onBack)
       Column(
         Modifier.verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
       ) {
-        AppearanceSection(settings, update)
+        appearanceSection(settings, update)
         HorizontalDivider()
-        AccountSection(
+        accountSection(
           savedAddress = bubbles.preferences.savedAddress,
           signedInAs = bubbles.user?.address,
           onForget = bubbles.preferences::forgetAddress,
         )
         HorizontalDivider()
-        NotificationSection(settings, update)
+        notificationSection(settings, update)
         HorizontalDivider()
-        ChatSection(settings, update)
+        chatSection(settings, update)
       }
     }
   }
@@ -82,7 +82,7 @@ fun SettingsScreen(bubbles: Bubbles, onBack: () -> Unit, modifier: Modifier = Mo
 
 /** "← Back" and the screen title. */
 @Composable
-private fun TopBar(onBack: () -> Unit) {
+private fun topBar(onBack: () -> Unit) {
   Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
     Row(Modifier.fillMaxWidth().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
       TextButton(onClick = onBack) { Text("← Back") }
@@ -93,7 +93,7 @@ private fun TopBar(onBack: () -> Unit) {
 
 /** A settings section: [title] above its [content]. */
 @Composable
-private fun Section(title: String, content: @Composable () -> Unit) {
+private fun section(title: String, content: @Composable () -> Unit) {
   Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
     Text(
       title,
@@ -107,20 +107,20 @@ private fun Section(title: String, content: @Composable () -> Unit) {
 
 /** Flavor choice and accent swatches. */
 @Composable
-private fun AppearanceSection(settings: Settings, update: ((Settings) -> Settings) -> Unit) {
-  Section("Appearance") {
+private fun appearanceSection(settings: Settings, update: ((Settings) -> Settings) -> Unit) {
+  section("Appearance") {
     Text("Flavor", style = MaterialTheme.typography.labelLarge)
     for (flavor in Flavor.entries) {
-      Choice(flavor.label, selected = settings.flavor == flavor) { update { it.copy(flavor = flavor) } }
+      choice(flavor.label, selected = settings.flavor == flavor) { update { it.copy(flavor = flavor) } }
     }
     Text("Accent: ${settings.accent.label}", style = MaterialTheme.typography.labelLarge)
-    AccentSwatches(settings.flavor, settings.accent) { accent -> update { it.copy(accent = accent) } }
+    accentSwatches(settings.flavor, settings.accent) { accent -> update { it.copy(accent = accent) } }
   }
 }
 
 /** One clickable circle per accent in [flavor]'s colours; [selected] is outlined. */
 @Composable
-private fun AccentSwatches(flavor: Flavor, selected: Accent, onSelect: (Accent) -> Unit) {
+private fun accentSwatches(flavor: Flavor, selected: Accent, onSelect: (Accent) -> Unit) {
   FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
     for (accent in Accent.entries) {
       val outline = if (accent == selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.surface
@@ -139,8 +139,8 @@ private fun AccentSwatches(flavor: Flavor, selected: Accent, onSelect: (Accent) 
 
 /** The remembered address with a button to forget it, and the signed-in account if any. */
 @Composable
-private fun AccountSection(savedAddress: String?, signedInAs: String?, onForget: () -> Unit) {
-  Section("Account") {
+private fun accountSection(savedAddress: String?, signedInAs: String?, onForget: () -> Unit) {
+  section("Account") {
     signedInAs?.let { Text("Signed in as $it") }
     Text("Remembered address: ${savedAddress ?: "none"}")
     OutlinedButton(onClick = onForget, enabled = savedAddress != null) { Text("Forget remembered address") }
@@ -149,15 +149,15 @@ private fun AccountSection(savedAddress: String?, signedInAs: String?, onForget:
 
 /** What happens when a message arrives. */
 @Composable
-private fun NotificationSection(settings: Settings, update: ((Settings) -> Settings) -> Unit) {
-  Section("Notifications") {
-    Toggle("Open the conversation when a message arrives", settings.openOnMessage) { on ->
+private fun notificationSection(settings: Settings, update: ((Settings) -> Settings) -> Unit) {
+  section("Notifications") {
+    toggle("Open the conversation when a message arrives", settings.openOnMessage) { on ->
       update { it.copy(openOnMessage = on) }
     }
-    Toggle("Bring the conversation to the front", settings.raiseOnMessage) { on ->
+    toggle("Bring the conversation to the front", settings.raiseOnMessage) { on ->
       update { it.copy(raiseOnMessage = on) }
     }
-    Toggle("Flash the window in the taskbar", settings.requestAttention) { on ->
+    toggle("Flash the window in the taskbar", settings.requestAttention) { on ->
       update { it.copy(requestAttention = on) }
     }
   }
@@ -165,16 +165,16 @@ private fun NotificationSection(settings: Settings, update: ((Settings) -> Setti
 
 /** Sending shortcut, message grouping and time format. */
 @Composable
-private fun ChatSection(settings: Settings, update: ((Settings) -> Settings) -> Unit) {
-  Section("Chat") {
-    Choice("Enter sends, Shift+Enter starts a new line", selected = settings.enterSends) {
+private fun chatSection(settings: Settings, update: ((Settings) -> Settings) -> Unit) {
+  section("Chat") {
+    choice("Enter sends, Shift+Enter starts a new line", selected = settings.enterSends) {
       update { it.copy(enterSends = true) }
     }
-    Choice("Ctrl+Enter sends, Enter starts a new line", selected = !settings.enterSends) {
+    choice("Ctrl+Enter sends, Enter starts a new line", selected = !settings.enterSends) {
       update { it.copy(enterSends = false) }
     }
-    Toggle("24-hour clock", settings.use24HourClock) { on -> update { it.copy(use24HourClock = on) } }
-    RunGapField(settings.runGapMinutes) { minutes -> update { it.copy(runGapMinutes = minutes) } }
+    toggle("24-hour clock", settings.use24HourClock) { on -> update { it.copy(use24HourClock = on) } }
+    runGapField(settings.runGapMinutes) { minutes -> update { it.copy(runGapMinutes = minutes) } }
   }
 }
 
@@ -183,7 +183,7 @@ private fun ChatSection(settings: Settings, update: ((Settings) -> Settings) -> 
  * focus, clamped to [Settings.RUN_GAP_RANGE]; anything that isn't a number reverts to [current].
  */
 @Composable
-private fun RunGapField(current: Int, onCommit: (Int) -> Unit) {
+private fun runGapField(current: Int, onCommit: (Int) -> Unit) {
   var draft by remember(current) { mutableStateOf(current.toString()) }
   OutlinedTextField(
     draft, { text -> draft = text.filter(Char::isDigit) },
@@ -201,7 +201,7 @@ private fun RunGapField(current: Int, onCommit: (Int) -> Unit) {
 
 /** A radio button row; the whole row is clickable. */
 @Composable
-private fun Choice(text: String, selected: Boolean, onSelect: () -> Unit) {
+private fun choice(text: String, selected: Boolean, onSelect: () -> Unit) {
   Row(
     Modifier.fillMaxWidth().selectable(selected, role = Role.RadioButton, onClick = onSelect),
     verticalAlignment = Alignment.CenterVertically,
@@ -214,7 +214,7 @@ private fun Choice(text: String, selected: Boolean, onSelect: () -> Unit) {
 
 /** A labelled switch; the whole row is clickable. */
 @Composable
-private fun Toggle(text: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+private fun toggle(text: String, checked: Boolean, onChange: (Boolean) -> Unit) {
   Row(
     Modifier.fillMaxWidth().toggleable(checked, role = Role.Switch, onValueChange = onChange).padding(vertical = 4.dp),
     verticalAlignment = Alignment.CenterVertically,

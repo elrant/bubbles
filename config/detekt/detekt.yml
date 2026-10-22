@@ -6,6 +6,9 @@ Compose:
   # Compose's strong skipping (on by default since Kotlin 2.0.20) already skips unchanged List parameters.
   UnstableCollections:
     active: false
+  # Composables are camelCase like any other function (naming>FunctionNaming), not Compose's PascalCase.
+  ComposableNaming:
+    active: false
 
 comments:
   # Private members are documented like the rest of the code, as with Javadoc.
@@ -26,11 +29,6 @@ complexity:
   TooManyFunctions:
     # Bubbles is the app's single state holder; count only its public API.
     ignorePrivate: true
-
-naming:
-  FunctionNaming:
-    # Composables are PascalCase by convention (enforced by Compose's ComposableNaming).
-    ignoreAnnotated: ['Composable']
 
 # Formatting (ktlint). Indentation is 2 spaces, as in .editorconfig.
 ktlint:
