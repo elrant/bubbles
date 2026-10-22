@@ -63,20 +63,20 @@ class Bubbles(accounts: AccountStore = AccountStore(), settingsStore: SettingsSt
     private set
 
   /** Contacts with an open conversation window, in opening order. */
-  val conversations: List<BareJid> get() = openConversations
-  private val openConversations = mutableStateListOf<BareJid>()
+  val conversations: List<BareJid>
+    field = mutableStateListOf<BareJid>()
   private val histories = mutableStateMapOf<BareJid, SnapshotStateList<ChatMessage>>()
 
   /** Messages received per contact since their conversation was last opened; contacts without any are absent. */
-  val unread: Map<BareJid, Int> get() = unreadCounts
-  private val unreadCounts = mutableStateMapOf<BareJid, Int>()
+  val unread: Map<BareJid, Int>
+    field = mutableStateMapOf<BareJid, Int>()
 
   /**
    * Messages received per contact since sign-in; contacts without any are absent. A change means the
    * conversation window should ask for attention (see [Settings.raiseOnMessage]).
    */
-  val incoming: Map<BareJid, Int> get() = incomingCounts
-  private val incomingCounts = mutableStateMapOf<BareJid, Int>()
+  val incoming: Map<BareJid, Int>
+    field = mutableStateMapOf<BareJid, Int>()
 
   private val avatars = mutableStateMapOf<BareJid, ImageBitmap>()
 
@@ -138,10 +138,10 @@ class Bubbles(accounts: AccountStore = AccountStore(), settingsStore: SettingsSt
     val current = user ?: return
     user = null
     contacts = emptyList()
-    openConversations.clear()
+    conversations.clear()
     histories.clear()
-    unreadCounts.clear()
-    incomingCounts.clear()
+    unread.clear()
+    incoming.clear()
     avatars.clear()
     requestedAvatars.clear()
     status = Status.Available
@@ -233,14 +233,14 @@ class Bubbles(accounts: AccountStore = AccountStore(), settingsStore: SettingsSt
 
   /** Opens a conversation window with [jid], unless one is already open, and marks its messages read. */
   fun openConversation(jid: BareJid) {
-    if (jid !in openConversations) openConversations += jid
-    unreadCounts -= jid
+    if (jid !in conversations) conversations += jid
+    unread -= jid
     user?.let { requestAvatar(it, jid, contact(jid).avatarHash) }
   }
 
   /** Closes the conversation window with [jid]. Its history is kept until sign-out. */
   fun closeConversation(jid: BareJid) {
-    openConversations -= jid
+    conversations -= jid
   }
 
   /** Adds [text] to the history with [to] and sends it in the background. */
@@ -256,11 +256,11 @@ class Bubbles(accounts: AccountStore = AccountStore(), settingsStore: SettingsSt
    */
   private fun receive(from: BareJid, body: String) {
     mutableHistory(from) += ChatMessage(body, outgoing = false)
-    incomingCounts[from] = (incomingCounts[from] ?: 0) + 1
-    if (from in openConversations || preferences.settings.openOnMessage) {
+    incoming[from] = (incoming[from] ?: 0) + 1
+    if (from in conversations || preferences.settings.openOnMessage) {
       openConversation(from)
     } else {
-      unreadCounts[from] = (unreadCounts[from] ?: 0) + 1
+      unread[from] = (unread[from] ?: 0) + 1
     }
   }
 
