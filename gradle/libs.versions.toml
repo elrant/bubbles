@@ -16,10 +16,10 @@ smack = "4.5.0-rc1"
 bcprov = "1.85"
 
 # kotlin / compose
-kotlin = "2.3.0"
+kotlin = "2.4.21"
 compose = "1.12.2"
 coroutines = "1.10.2"
-shadow = "9.3.0"
+shadow = "9.6.1"
 
 # lint
 detekt        = "2.0.0-alpha.6"
