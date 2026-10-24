@@ -1,25 +1,47 @@
 package team.elrant.bubbles.xmpp
 
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.jivesoftware.smack.ConnectionConfiguration
 import org.jivesoftware.smack.SmackException
 import org.jivesoftware.smack.XMPPException
 import org.jivesoftware.smack.chat2.ChatManager
+import org.jivesoftware.smack.packet.Message
 import org.jivesoftware.smack.packet.Presence
 import org.jivesoftware.smack.packet.StandardExtensionElement
+import org.jivesoftware.smack.packet.Stanza
 import org.jivesoftware.smack.packet.StanzaError
 import org.jivesoftware.smack.roster.Roster
 import org.jivesoftware.smack.roster.RosterListener
 import org.jivesoftware.smack.tcp.XMPPTCPConnection
 import org.jivesoftware.smack.tcp.XMPPTCPConnectionConfiguration
 import org.jivesoftware.smack.util.stringencoder.Base64
+import org.jivesoftware.smackx.carbons.packet.CarbonExtension
+import org.jivesoftware.smackx.omemo.OmemoManager
+import org.jivesoftware.smackx.omemo.OmemoMessage
+import org.jivesoftware.smackx.omemo.element.OmemoElement
+import org.jivesoftware.smackx.omemo.exceptions.CorruptedOmemoKeyException
+import org.jivesoftware.smackx.omemo.exceptions.CryptoFailedException
+import org.jivesoftware.smackx.omemo.exceptions.UndecidedOmemoIdentityException
+import org.jivesoftware.smackx.omemo.internal.OmemoDevice
+import org.jivesoftware.smackx.omemo.listener.OmemoMessageListener
+import org.jivesoftware.smackx.omemo.signal.SignalFileBasedOmemoStore
+import org.jivesoftware.smackx.omemo.signal.SignalOmemoService
+import org.jivesoftware.smackx.omemo.trust.OmemoFingerprint
+import org.jivesoftware.smackx.omemo.trust.TrustState
+import org.jivesoftware.smackx.omemo.util.OmemoConstants
+import org.jivesoftware.smackx.pubsub.PubSubException
 import org.jivesoftware.smackx.vcardtemp.VCardManager
 import org.jxmpp.jid.BareJid
 import org.jxmpp.jid.Jid
 import org.jxmpp.jid.impl.JidCreate
 import org.slf4j.LoggerFactory
 import team.elrant.bubbles.model.Contact
+import team.elrant.bubbles.model.OmemoIdentity
 import team.elrant.bubbles.model.Status
+import team.elrant.bubbles.store.OmemoVault
+import java.io.IOException
 import java.net.InetAddress
+import java.security.Security
 import java.security.cert.CertificateParsingException
 import java.security.cert.X509Certificate
 import javax.net.ssl.SSLPeerUnverifiedException
@@ -35,20 +57,28 @@ import javax.net.ssl.SSLSession
  * @param password account password; used only for login.
  * @property serviceName XMPP domain; also resolved as the host to connect to.
  * @param onMessage invoked for every incoming chat message that has a body, with this connection as
- *   `source`.
+ *   `source`; `encrypted` tells whether it arrived OMEMO-encrypted.
  * @param onRosterChanged invoked with this connection when roster entries or contact presences change.
+ * @param requireApproval whether OMEMO devices not seen before must be approved instead of trusted on first use;
+ *   read whenever a device turns up.
  */
 class ConnectedUser(
   val username: String,
   private val password: String,
   val serviceName: String,
-  private val onMessage: (source: ConnectedUser, from: BareJid, body: String) -> Unit = { _, _, _ -> },
+  private val onMessage: (source: ConnectedUser, from: BareJid, body: String, encrypted: Boolean) -> Unit =
+    { _, _, _, _ ->
+    },
   private val onRosterChanged: (source: ConnectedUser) -> Unit = {},
+  private val requireApproval: () -> Boolean = { false },
 ) {
   private var connection: XMPPTCPConnection? = null
   private var chat: ChatManager? = null
   private var roster: Roster? = null
   private var vCards: VCardManager? = null
+  private var omemo: OmemoManager? = null
+  private var trust: DeviceTrust? = null
+  private var vault: OmemoVault? = null
 
   /** The account's bare JID, `username@serviceName`. */
   val address: String get() = "$username@$serviceName"
@@ -81,9 +111,13 @@ class ConnectedUser(
 
     chat = ChatManager.getInstanceFor(conn).also { manager ->
       manager.addIncomingListener { from, message, _ ->
+        // An encrypted message may carry a plain-text hint body, which must not be shown as the message.
+        if (message.hasExtension(OmemoElement.NAME_ENCRYPTED, OmemoConstants.OMEMO_NAMESPACE_V_AXOLOTL)) {
+          return@addIncomingListener
+        }
         val body = message.body ?: return@addIncomingListener
         logger.info("Received message from {}: {}", from, body)
-        onMessage(this@ConnectedUser, from, body)
+        onMessage(this@ConnectedUser, from, body, false)
       }
     }
     roster = Roster.getInstanceFor(conn).apply {
@@ -99,6 +133,65 @@ class ConnectedUser(
       reloadAndWait()
     }
     vCards = VCardManager.getInstanceFor(conn)
+    omemo = setUpOmemo(conn)
+    if (omemo == null) {
+      vault?.close()
+      vault = null
+    }
+  }
+
+  /**
+   * Starts OMEMO on [conn]: opens the key store, publishes our device and bundle, and routes decrypted messages to
+   * `onMessage`. Returns `null` if that fails, in which case messages go out unencrypted; signing in still works.
+   */
+  private fun setUpOmemo(conn: XMPPTCPConnection): OmemoManager? = try {
+    SignalOmemoService.acknowledgeLicense()
+    SignalOmemoService.setup()
+    val keys = OmemoVault(address)
+    val directory = keys.open()
+    vault = keys
+    (SignalOmemoService.getInstance() as SignalOmemoService).omemoStoreBackend =
+      SignalFileBasedOmemoStore(directory.toFile())
+    OmemoManager.getInstanceFor(conn).also { manager ->
+      val deviceTrust = DeviceTrust(directory.resolve("trust.json"), requireApproval)
+      trust = deviceTrust
+      manager.setTrustCallback(deviceTrust)
+      manager.addOmemoMessageListener(object : OmemoMessageListener {
+        override fun onOmemoMessageReceived(stanza: Stanza, decrypted: OmemoMessage.Received) {
+          val body = decrypted.body ?: return
+          val from = (stanza as? Message)?.from?.asBareJid() ?: return
+          logger.info("Received encrypted message from {}", from)
+          onMessage(this@ConnectedUser, from, body, true)
+          sealKeys()
+        }
+
+        override fun onOmemoCarbonCopyReceived(
+          direction: CarbonExtension.Direction,
+          carbonCopy: Message,
+          wrappingMessage: Message,
+          decryptedCarbonCopy: OmemoMessage.Received,
+        ) = Unit
+      })
+      manager.initialize()
+      sealKeys()
+      logger.info("OMEMO ready, device {}", manager.deviceId)
+    }
+  } catch (e: SmackException) {
+    omemoUnavailable("server error", e)
+  } catch (e: XMPPException) {
+    omemoUnavailable("server refused", e)
+  } catch (e: CorruptedOmemoKeyException) {
+    omemoUnavailable("stored keys are corrupted", e)
+  } catch (e: PubSubException.NotALeafNodeException) {
+    omemoUnavailable("the server's PEP node is not a leaf", e)
+  } catch (e: IOException) {
+    omemoUnavailable("keys can't be stored safely", e)
+  }
+
+  /** Logs why OMEMO can't run, for [reason], and returns no manager. */
+  private fun omemoUnavailable(reason: String, cause: Exception): OmemoManager? {
+    logger.warn("OMEMO unavailable, {}: {}", reason, cause.message)
+    return null
   }
 
   /** Snapshot of the roster with each contact's current presence; empty before [initializeConnection]. */
@@ -155,21 +248,95 @@ class ConnectedUser(
     roster.createItem(contact, entry.name, groups.toTypedArray())
   }
 
-  /** Sends [message] to [contact] (user@service.name). Blocking. Failures are logged, not thrown. */
-  fun sendMessage(contact: BareJid, message: String) {
-    try {
-      val entity = contact.asEntityBareJidIfPossible()
-      if (entity == null) {
-        logger.error("Cannot chat with {}: not a user JID", contact)
-        return
+  /**
+   * Sends [message] to [contact] (user@service.name). Blocking. Failures are logged, not thrown.
+   *
+   * With [encrypt], the message is OMEMO-encrypted if OMEMO is running and [contact] supports it; otherwise it is
+   * sent as plain text, which the result reports.
+   */
+  fun sendMessage(contact: BareJid, message: String, encrypt: Boolean): SendResult {
+    val entity = contact.asEntityBareJidIfPossible()
+    val conn = connection
+    if (entity == null || conn == null) {
+      logger.error("Cannot chat with {}: not a user JID or not connected", contact)
+      return SendResult.Failed
+    }
+    return try {
+      val manager = omemo?.takeIf { encrypt && it.contactSupportsOmemo(contact) }
+      if (manager != null) {
+        val sent = manager.encrypt(contact, message)
+        if (sent.isMissingRecipients) {
+          logger.warn("Not encrypted for all devices of {}: {}", contact, sent.skippedDevices)
+        }
+        conn.sendStanza(sent.buildMessage(conn.stanzaFactory.buildMessageStanza(), entity))
+        sealKeys()
+        SendResult.Encrypted
+      } else {
+        chat?.chatWith(entity)?.send(message)
+        SendResult.Plain
       }
-      chat?.chatWith(entity)?.send(message)
-    } catch (e: SmackException.NotConnectedException) {
-      logger.error("Error sending XMPP message: {}", e.message)
+    } catch (e: SmackException) {
+      sendFailed(contact, "connection problem", e)
+    } catch (e: XMPPException) {
+      sendFailed(contact, "server refused it", e)
+    } catch (e: UndecidedOmemoIdentityException) {
+      sendFailed(contact, "undecided OMEMO identities ${e.undecidedDevices}", e)
+    } catch (e: CryptoFailedException) {
+      sendFailed(contact, "encryption failed", e)
+    } catch (e: PubSubException.NotALeafNodeException) {
+      sendFailed(contact, "OMEMO devices couldn't be looked up", e)
+    } catch (e: IOException) {
+      sendFailed(contact, "I/O error", e)
     } catch (e: InterruptedException) {
       Thread.currentThread().interrupt()
-      logger.error("Interrupted while sending XMPP message: {}", e.message)
+      sendFailed(contact, "interrupted", e)
     }
+  }
+
+  /** Logs that a message to [contact] wasn't sent, for [reason], and reports the failure. */
+  private fun sendFailed(contact: BareJid, reason: String, cause: Exception): SendResult {
+    logger.error("Could not send a message to {}: {}: {}", contact, reason, cause.message)
+    return SendResult.Failed
+  }
+
+  /**
+   * Our own OMEMO device and its fingerprint; `null` if OMEMO isn't running. Blocking. Throws if the keys can't be
+   * read.
+   */
+  fun ownIdentity(): OmemoIdentity? {
+    val manager = omemo ?: return null
+    return OmemoIdentity(
+      jid, manager.deviceId, manager.ownFingerprint.toString(), OmemoIdentity.Trust.Trusted,
+    )
+  }
+
+  /**
+   * The OMEMO devices of [contact] (or of another of our own devices if it is [jid]) with their fingerprints and
+   * trust. Empty if OMEMO isn't running. Blocking, and contacts' bundles are fetched. Throws if that fails.
+   */
+  fun identities(contact: BareJid): List<OmemoIdentity> {
+    val manager = omemo
+    val decisions = trust
+    if (manager == null || decisions == null) return emptyList()
+    return manager.getActiveFingerprints(contact).map { (device, fingerprint) ->
+      OmemoIdentity(
+        contact, device.deviceId, fingerprint.toString(),
+        when (decisions.peek(device, fingerprint)) {
+          TrustState.trusted -> OmemoIdentity.Trust.Trusted
+          TrustState.untrusted -> OmemoIdentity.Trust.Untrusted
+          TrustState.undecided -> OmemoIdentity.Trust.Undecided
+        },
+      )
+    }.sortedBy { it.deviceId }
+  }
+
+  /** Trusts or distrusts [identity] from now on. Does nothing if OMEMO isn't running. */
+  fun setTrusted(identity: OmemoIdentity, trusted: Boolean) {
+    val manager = omemo ?: return
+    val device = OmemoDevice(identity.jid, identity.deviceId)
+    val fingerprint = OmemoFingerprint(identity.fingerprint)
+    if (trusted) manager.trustOmemoIdentity(device, fingerprint) else manager.distrustOmemoIdentity(device, fingerprint)
+    sealKeys()
   }
 
   /**
@@ -190,6 +357,17 @@ class ConnectedUser(
   /** Closes the connection. Blocking. */
   fun disconnect() {
     connection?.disconnect()
+    vault?.close()
+    vault = null
+  }
+
+  /** Saves the OMEMO keys back into the encrypted vault; a failure is logged, since the keys stay in memory. */
+  private fun sealKeys() {
+    try {
+      vault?.flush()
+    } catch (e: IOException) {
+      logger.error("Could not save the OMEMO keys: {}", e.message)
+    }
   }
 
   companion object {
@@ -201,6 +379,8 @@ class ConnectedUser(
     // Smack's SASL login needs a Base64 encoder, normally registered by smack-java11, which isn't a
     // dependency; back it with the JDK's.
     init {
+      // OMEMO's AES/GCM cipher needs a provider that accepts an IvParameterSpec, which the JDK's doesn't.
+      Security.insertProviderAt(BouncyCastleProvider(), 1)
       Base64.setEncoder(object : Base64.Encoder {
         private val encoder = java.util.Base64.getEncoder()
         private val decoder = java.util.Base64.getDecoder()
@@ -255,4 +435,16 @@ class ConnectedUser(
       false
     }
   }
+}
+
+/** What became of a message passed to [ConnectedUser.sendMessage]. */
+enum class SendResult {
+  /** Sent OMEMO-encrypted. */
+  Encrypted,
+
+  /** Sent as plain text. */
+  Plain,
+
+  /** Not sent. */
+  Failed,
 }

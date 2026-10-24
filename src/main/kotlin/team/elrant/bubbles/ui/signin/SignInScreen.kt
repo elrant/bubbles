@@ -25,6 +25,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,6 +56,7 @@ fun signInScreen(bubbles: Bubbles, onOpenSettings: () -> Unit, modifier: Modifie
   var password by remember { mutableStateOf("") }
   var status by remember { mutableStateOf(Status.Available) }
   var rememberMe by remember { mutableStateOf(bubbles.preferences.savedAddress != null) }
+  var rememberPassword by remember { mutableStateOf(false) }
   var busy by remember { mutableStateOf(false) }
   var job by remember { mutableStateOf<Job?>(null) }
   var error by remember { mutableStateOf<String?>(null) }
@@ -69,13 +71,23 @@ fun signInScreen(bubbles: Bubbles, onOpenSettings: () -> Unit, modifier: Modifie
     busy = true
     job = scope.launch {
       try {
-        bubbles.signIn(address.trim(), password, status, rememberMe)
+        bubbles.signIn(address.trim(), password, status, rememberMe, rememberPassword)
       } catch (e: SignInException) {
         error = "Could not sign in: ${e.message}"
       } finally {
         busy = false
       }
     }
+  }
+
+  // A password kept in the keyring fills the form for the remembered address and signs in, once per run, so
+  // signing out or coming back from the settings doesn't sign in again.
+  LaunchedEffect(Unit) {
+    val signInNow = keptPassword(bubbles) {
+      password = it
+      rememberPassword = true
+    }
+    if (signInNow) signIn()
   }
 
   Surface(modifier.fillMaxSize()) {
@@ -100,6 +112,7 @@ fun signInScreen(bubbles: Bubbles, onOpenSettings: () -> Unit, modifier: Modifie
           password = password, onPassword = { password = it },
           status = status, onStatus = { status = it },
           rememberMe = rememberMe, onRememberMe = { rememberMe = it },
+          rememberPassword = rememberPassword, onRememberPassword = { rememberPassword = it },
           onSubmit = ::signIn,
         )
         Spacer(Modifier.height(8.dp))
@@ -118,7 +131,17 @@ fun signInScreen(bubbles: Bubbles, onOpenSettings: () -> Unit, modifier: Modifie
   }
 }
 
-/** Stateless address/password/status/"Remember me" fields; Enter in either text field submits. */
+/**
+ * Passes the password kept for the remembered address, if any, to [onFound]. Returns whether to sign in with it
+ * right away, which happens only the first time per run.
+ */
+private suspend fun keptPassword(bubbles: Bubbles, onFound: (String) -> Unit): Boolean {
+  val kept = bubbles.preferences.savedAddress?.let { bubbles.credentials.saved(it) } ?: return false
+  onFound(kept)
+  return bubbles.credentials.claimAutoSignIn()
+}
+
+/** Stateless address/password/status/"Remember me"/"Remember password" fields; Enter in either text field submits. */
 @Composable
 private fun signInForm(
   address: String,
@@ -129,6 +152,8 @@ private fun signInForm(
   onStatus: (Status) -> Unit,
   rememberMe: Boolean,
   onRememberMe: (Boolean) -> Unit,
+  rememberPassword: Boolean,
+  onRememberPassword: (Boolean) -> Unit,
   onSubmit: () -> Unit,
 ) {
   val submit = KeyboardActions(onDone = { onSubmit() })
@@ -157,6 +182,10 @@ private fun signInForm(
     Row(Modifier.offset(x = (-12).dp), verticalAlignment = Alignment.CenterVertically) {
       Checkbox(rememberMe, onRememberMe)
       Text("Remember me")
+    }
+    Row(Modifier.offset(x = (-12).dp), verticalAlignment = Alignment.CenterVertically) {
+      Checkbox(rememberPassword, onRememberPassword)
+      Text("Remember password in the system keyring")
     }
     Button(onClick = onSubmit, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("Sign in") }
   }
