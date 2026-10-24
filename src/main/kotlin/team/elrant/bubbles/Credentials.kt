@@ -2,6 +2,7 @@ package team.elrant.bubbles
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runInterruptible
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import team.elrant.bubbles.secrets.Keyring
 import team.elrant.bubbles.secrets.KeyringException
@@ -45,7 +46,7 @@ class Credentials {
   fun claimAutoSignIn(): Boolean = !autoSignInClaimed.also { autoSignInClaimed = true }
 
   private companion object {
-    val logger = LoggerFactory.getLogger(Credentials::class.java)
+    val logger: Logger = LoggerFactory.getLogger(Credentials::class.java)
     const val KIND = "password"
   }
 }

@@ -6,6 +6,7 @@ import org.jivesoftware.smack.SmackException
 import org.jivesoftware.smackx.omemo.exceptions.CannotEstablishOmemoSessionException
 import org.jivesoftware.smackx.omemo.exceptions.CorruptedOmemoKeyException
 import org.jxmpp.jid.BareJid
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import team.elrant.bubbles.model.OmemoIdentity
 import team.elrant.bubbles.xmpp.ConnectedUser
@@ -21,18 +22,7 @@ class OmemoKeys(private val user: () -> ConnectedUser?) {
   /** Our own OMEMO device and fingerprint, or `null` if signed out, OMEMO isn't running or the keys are unreadable. */
   suspend fun own(): OmemoIdentity? {
     val current = user() ?: return null
-    return try {
-      runInterruptible(Dispatchers.IO) { current.ownIdentity() }
-    } catch (e: CorruptedOmemoKeyException) {
-      logger.warn(KEY_FAILED, e.message)
-      null
-    } catch (e: SmackException) {
-      logger.warn(KEY_FAILED, e.message)
-      null
-    } catch (e: IOException) {
-      logger.warn(KEY_FAILED, e.message)
-      null
-    }
+    return guarded("Could not read our OMEMO fingerprint", "this device") { current.ownIdentity() }
   }
 
   /**
@@ -41,21 +31,7 @@ class OmemoKeys(private val user: () -> ConnectedUser?) {
    */
   suspend fun devicesOf(jid: BareJid): List<OmemoIdentity>? {
     val current = user() ?: return null
-    return try {
-      runInterruptible(Dispatchers.IO) { current.identities(jid) }
-    } catch (e: CorruptedOmemoKeyException) {
-      logger.warn(IDENTITIES_FAILED, jid, e.message)
-      null
-    } catch (e: CannotEstablishOmemoSessionException) {
-      logger.warn(IDENTITIES_FAILED, jid, e.message)
-      null
-    } catch (e: SmackException) {
-      logger.warn(IDENTITIES_FAILED, jid, e.message)
-      null
-    } catch (e: IOException) {
-      logger.warn(IDENTITIES_FAILED, jid, e.message)
-      null
-    }
+    return guarded("Could not list the OMEMO devices", jid) { current.identities(jid) }
   }
 
   /** Trusts or distrusts [identity] from now on, so messages are or are no longer encrypted to that device. */
@@ -64,9 +40,25 @@ class OmemoKeys(private val user: () -> ConnectedUser?) {
     runInterruptible(Dispatchers.IO) { current.setTrusted(identity, trusted) }
   }
 
+  /** Runs [block] on [Dispatchers.IO]; if it fails, logs "[what] for [subject]: reason" and returns `null`. */
+  private suspend fun <T> guarded(what: String, subject: Any, block: () -> T): T? = try {
+    runInterruptible(Dispatchers.IO, block = block)
+  } catch (e: CorruptedOmemoKeyException) {
+    failed(what, subject, e)
+  } catch (e: CannotEstablishOmemoSessionException) {
+    failed(what, subject, e)
+  } catch (e: SmackException) {
+    failed(what, subject, e)
+  } catch (e: IOException) {
+    failed(what, subject, e)
+  }
+
+  private fun failed(what: String, subject: Any, cause: Exception): Nothing? {
+    logger.warn("{} for {}: {}", what, subject, cause.message)
+    return null
+  }
+
   private companion object {
-    val logger = LoggerFactory.getLogger(OmemoKeys::class.java)
-    const val IDENTITIES_FAILED = "Could not list the OMEMO devices of {}: {}"
-    const val KEY_FAILED = "Could not read our OMEMO fingerprint: {}"
+    val logger: Logger = LoggerFactory.getLogger(OmemoKeys::class.java)
   }
 }

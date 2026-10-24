@@ -30,7 +30,11 @@ class Keyring private constructor(
   /** The secret saved for [account] and [kind], or `null` if there is none. */
   fun get(account: String, kind: String): ByteArray? = call {
     val item = find(account, kind) ?: return@call null
-    remote(item.path, ItemApi::class.java).getSecret(session).value
+    val secret = remote(item.path, ItemApi::class.java).getSecret(session)
+    // With the plain algorithm the secret comes back as is, with no encryption parameters.
+    if (secret.parameters.isNotEmpty()) throw KeyringException("Unexpected secret format")
+    logger.debug("Read a {} secret", secret.contentType)
+    secret.value
   }
 
   /** Saves [secret] for [account] and [kind], replacing any previous one; [label] is what the keyring shows. */
@@ -38,12 +42,13 @@ class Keyring private constructor(
     val collection = service.readAlias(DEFAULT_ALIAS)
     if (collection.path == NO_OBJECT) throw KeyringException("The keyring has no default collection")
     unlock(collection)
-    val properties = mapOf<String, Variant<*>>(
+    val properties = mapOf(
       "org.freedesktop.Secret.Item.Label" to Variant(label),
       "org.freedesktop.Secret.Item.Attributes" to Variant(attributes(account, kind), "a{ss}"),
     )
     val created = remote(collection.path, CollectionApi::class.java)
       .createItem(properties, Secret(session, ByteArray(0), secret, CONTENT_TYPE), true)
+    logger.debug("Stored {} as {}", kind, created.item.path)
     awaitPrompt(created.prompt)
   }
 
@@ -57,11 +62,15 @@ class Keyring private constructor(
     try {
       remote(session.path, SessionApi::class.java).close()
     } catch (e: DBusException) {
-      logger.debug("Could not close the Secret Service session: {}", e.message)
+      closeFailed(e)
     } catch (e: DBusExecutionException) {
-      logger.debug("Could not close the Secret Service session: {}", e.message)
+      closeFailed(e)
     }
     connection.disconnect()
+  }
+
+  private fun closeFailed(cause: Exception) {
+    logger.debug("Could not close the Secret Service session: {}", cause.message)
   }
 
   /** The item for [account] and [kind], unlocked; `null` if there is none. */
@@ -121,7 +130,9 @@ class Keyring private constructor(
       }
       return try {
         val service = connection.getRemoteObject(BUS_NAME, SERVICE_PATH, ServiceApi::class.java)
-        Keyring(connection, service, service.openSession("plain", Variant("")).session)
+        val opened = service.openSession("plain", Variant(""))
+        if (opened.output.value != "") throw KeyringException("The keyring didn't accept a plain session")
+        Keyring(connection, service, opened.session)
       } catch (e: DBusException) {
         unavailable(connection, e)
       } catch (e: DBusExecutionException) {
