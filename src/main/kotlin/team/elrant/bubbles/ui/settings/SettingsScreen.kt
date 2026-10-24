@@ -72,6 +72,7 @@ fun settingsScreen(bubbles: Bubbles, onBack: () -> Unit, modifier: Modifier = Mo
           onForget = bubbles.preferences::forgetAddress,
         )
         HorizontalDivider()
+        privacySection(settings, update)
         notificationSection(settings, update)
         HorizontalDivider()
         chatSection(settings, update)
@@ -144,6 +145,16 @@ private fun accountSection(savedAddress: String?, signedInAs: String?, onForget:
     signedInAs?.let { Text("Signed in as $it") }
     Text("Remembered address: ${savedAddress ?: "none"}")
     OutlinedButton(onClick = onForget, enabled = savedAddress != null) { Text("Forget remembered address") }
+  }
+}
+
+/** Whether outgoing messages are encrypted. */
+@Composable
+private fun privacySection(settings: Settings, update: ((Settings) -> Settings) -> Unit) {
+  section("Privacy") {
+    toggle("Encrypt messages with OMEMO when the contact supports it", settings.encryptMessages) { on ->
+      update { it.copy(encryptMessages = on) }
+    }
   }
 }
 
