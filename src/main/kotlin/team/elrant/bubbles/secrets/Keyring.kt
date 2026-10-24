@@ -31,8 +31,11 @@ class Keyring private constructor(
   fun get(account: String, kind: String): ByteArray? = call {
     val item = find(account, kind) ?: return@call null
     val secret = remote(item.path, ItemApi::class.java).getSecret(session)
-    // With the plain algorithm the secret comes back as is, with no encryption parameters.
-    if (secret.parameters.isNotEmpty()) throw KeyringException("Unexpected secret format")
+    // With the plain algorithm the secret comes back as is: same session, no encryption parameters. Paths are
+    // compared as strings because DBusPath.equals also compares where the path was received from.
+    if (secret.session.path != session.path || secret.parameters.isNotEmpty()) {
+      throw KeyringException("Unexpected secret format")
+    }
     logger.debug("Read a {} secret", secret.contentType)
     secret.value
   }
@@ -81,7 +84,12 @@ class Keyring private constructor(
 
   /** Unlocks [path], waiting for the user to answer the keyring's prompt if it shows one. */
   private fun unlock(path: DBusPath) {
-    awaitPrompt(service.unlock(listOf(path)).prompt)
+    val result = service.unlock(listOf(path))
+    // Without a prompt the keyring unlocks the object (or reports it already is) right away.
+    if (result.prompt.path == NO_OBJECT && result.unlocked.none { it.path == path.path }) {
+      throw KeyringException("Could not unlock the keyring")
+    }
+    awaitPrompt(result.prompt)
   }
 
   /** Runs [prompt] if it is a real one, and waits for the user to confirm it. */
