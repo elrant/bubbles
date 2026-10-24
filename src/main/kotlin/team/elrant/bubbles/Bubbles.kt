@@ -258,14 +258,18 @@ class Bubbles(accounts: AccountStore = AccountStore(), settingsStore: SettingsSt
   fun sendMessage(to: BareJid, text: String) {
     val current = user ?: return
     val history = mutableHistory(to)
-    val pending = ChatMessage(text, outgoing = true)
+    val pending = ChatMessage(text, outgoing = true, pending = true)
     history += pending
     val encrypt = preferences.settings.encryptMessages
     scope.launch {
       val result = withContext(Dispatchers.IO) { current.sendMessage(to, text, encrypt) }
       val index = history.indexOf(pending)
       if (index >= 0) {
-        history[index] = pending.copy(encrypted = result == SendResult.Encrypted, failed = result == SendResult.Failed)
+        history[index] = pending.copy(
+          encrypted = result == SendResult.Encrypted,
+          failed = result == SendResult.Failed,
+          pending = false,
+        )
       }
     }
   }

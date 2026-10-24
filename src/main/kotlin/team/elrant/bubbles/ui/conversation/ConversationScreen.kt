@@ -185,21 +185,28 @@ private fun history(
   }
 }
 
-/** [message]'s text, with a note underneath if it was sent encrypted or could not be sent. */
+/**
+ * [message]'s text. Encryption is meant to be invisible, so a banner appears under it only when something is off:
+ * it was sent or received as plain text, or it could not be sent.
+ */
 @Composable
 private fun messageText(message: ChatMessage) {
   Column(Modifier.fillMaxWidth().padding(start = 16.dp, top = 2.dp)) {
     Text(message.body)
-    val note = when {
+    val banner = when {
       message.failed -> "Not sent"
-      message.encrypted -> "Encrypted with OMEMO"
-      else -> return@Column
+      message.pending || message.encrypted -> return@Column
+      else -> "Not encrypted"
     }
-    Text(
-      note,
-      style = MaterialTheme.typography.labelSmall,
-      color = if (message.failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    val colors = MaterialTheme.colorScheme
+    Surface(
+      Modifier.padding(top = 2.dp),
+      shape = MaterialTheme.shapes.extraSmall,
+      color = if (message.failed) colors.errorContainer else colors.surfaceVariant,
+      contentColor = if (message.failed) colors.onErrorContainer else colors.onSurfaceVariant,
+    ) {
+      Text(banner, Modifier.padding(horizontal = 6.dp, vertical = 1.dp), style = MaterialTheme.typography.labelSmall)
+    }
   }
 }
 
