@@ -62,15 +62,6 @@ fun signInScreen(bubbles: Bubbles, onOpenSettings: () -> Unit, modifier: Modifie
   var error by remember { mutableStateOf<String?>(null) }
   val scope = rememberCoroutineScope()
 
-  // A password kept in the keyring fills the form for the remembered address.
-  LaunchedEffect(Unit) {
-    val saved = bubbles.preferences.savedAddress ?: return@LaunchedEffect
-    bubbles.credentials.saved(saved)?.let {
-      password = it
-      rememberPassword = true
-    }
-  }
-
   fun signIn() {
     if (busy) return
     if (address.isBlank() || password.isEmpty()) {
@@ -87,6 +78,16 @@ fun signInScreen(bubbles: Bubbles, onOpenSettings: () -> Unit, modifier: Modifie
         busy = false
       }
     }
+  }
+
+  // A password kept in the keyring fills the form for the remembered address and signs in, once per run, so
+  // signing out or coming back from the settings doesn't sign in again.
+  LaunchedEffect(Unit) {
+    val signInNow = keptPassword(bubbles) {
+      password = it
+      rememberPassword = true
+    }
+    if (signInNow) signIn()
   }
 
   Surface(modifier.fillMaxSize()) {
@@ -128,6 +129,16 @@ fun signInScreen(bubbles: Bubbles, onOpenSettings: () -> Unit, modifier: Modifie
       confirmButton = { TextButton(onClick = { error = null }) { Text("OK") } },
     )
   }
+}
+
+/**
+ * Passes the password kept for the remembered address, if any, to [onFound]. Returns whether to sign in with it
+ * right away, which happens only the first time per run.
+ */
+private suspend fun keptPassword(bubbles: Bubbles, onFound: (String) -> Unit): Boolean {
+  val kept = bubbles.preferences.savedAddress?.let { bubbles.credentials.saved(it) } ?: return false
+  onFound(kept)
+  return bubbles.credentials.claimAutoSignIn()
 }
 
 /** Stateless address/password/status/"Remember me"/"Remember password" fields; Enter in either text field submits. */
