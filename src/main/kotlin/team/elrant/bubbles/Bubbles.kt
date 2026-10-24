@@ -51,6 +51,9 @@ class Bubbles(accounts: AccountStore = AccountStore(), settingsStore: SettingsSt
   /** OMEMO fingerprints and trust of the signed-in account and its contacts. */
   val omemoKeys = OmemoKeys { user }
 
+  /** Passwords remembered in the system keyring. */
+  val credentials = Credentials()
+
   /** The signed-in account, or `null` while on the sign-in screen. */
   var user by mutableStateOf<ConnectedUser?>(null)
     private set
@@ -106,9 +109,16 @@ class Bubbles(accounts: AccountStore = AccountStore(), settingsStore: SettingsSt
    * @param password account password; not stored.
    * @param status initial presence, published right after login.
    * @param rememberMe whether to save [address] for next time; `false` forgets any saved one.
+   * @param rememberPassword whether to keep [password] in the system keyring; `false` deletes any kept one.
    * @throws SignInException if [address] isn't a valid bare JID, or connecting or logging in fails.
    */
-  suspend fun signIn(address: String, password: String, status: Status, rememberMe: Boolean) {
+  suspend fun signIn(
+    address: String,
+    password: String,
+    status: Status,
+    rememberMe: Boolean,
+    rememberPassword: Boolean,
+  ) {
     val jid = try {
       JidCreate.entityBareFrom(address)
     } catch (e: XmppStringprepException) {
@@ -130,6 +140,7 @@ class Bubbles(accounts: AccountStore = AccountStore(), settingsStore: SettingsSt
     connect(connected, status)
 
     preferences.rememberAddress(address.takeIf { rememberMe })
+    if (rememberPassword) credentials.save(address, password) else credentials.forget(address)
     this.status = status
     personalMessage = ""
     user = connected
