@@ -13,13 +13,16 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 /**
- * Trust on first use: the first fingerprint seen for a device is trusted and remembered, and a device that later
- * shows a different fingerprint is [TrustState.undecided], so nothing is encrypted to it until a user decides.
- * Decisions are kept in [file]; I/O errors are logged and the decisions then only last for this session.
+ * Remembers which OMEMO devices (by fingerprint) are trusted. A device with no decision yet is trusted on first use,
+ * unless [requireApproval] says otherwise, in which case it stays [TrustState.undecided] until a user decides. A
+ * device that later shows a different fingerprint is always [TrustState.undecided]. Nothing is encrypted to
+ * undecided or untrusted devices. Decisions are kept in [file]; I/O errors are logged and the decisions then only
+ * last for this session.
  *
  * @param file JSON file holding the decisions.
+ * @param requireApproval whether unknown devices need approval instead of being trusted on first use; read each time.
  */
-internal class TofuTrust(private val file: Path) : OmemoTrustCallback {
+internal class DeviceTrust(private val file: Path, private val requireApproval: () -> Boolean) : OmemoTrustCallback {
   /** Device (`jid:id`) to its pinned fingerprint and state. */
   private val entries: MutableMap<String, Pinned> = load()
 
@@ -28,6 +31,11 @@ internal class TofuTrust(private val file: Path) : OmemoTrustCallback {
     val key = key(device)
     val pinned = entries[key]
     return when {
+      pinned == null && requireApproval() -> {
+        logger.info("OMEMO device {} with fingerprint {} awaits approval", device, fingerprint)
+        TrustState.undecided
+      }
+
       pinned == null -> {
         logger.info("Trusting new OMEMO device {} on first use, fingerprint {}", device, fingerprint)
         setTrust(device, fingerprint, TrustState.trusted)
@@ -43,6 +51,13 @@ internal class TofuTrust(private val file: Path) : OmemoTrustCallback {
         TrustState.valueOf(pinned.state)
       }
     }
+  }
+
+  /** The state of [device] with [fingerprint] as last decided, without deciding anything; undecided if unknown. */
+  @Synchronized
+  fun peek(device: OmemoDevice, fingerprint: OmemoFingerprint): TrustState {
+    val pinned = entries[key(device)]
+    return if (pinned?.fingerprint == fingerprint.toString()) TrustState.valueOf(pinned.state) else TrustState.undecided
   }
 
   @Synchronized
@@ -86,7 +101,7 @@ internal class TofuTrust(private val file: Path) : OmemoTrustCallback {
   )
 
   companion object {
-    private val logger = LoggerFactory.getLogger(TofuTrust::class.java)
+    private val logger = LoggerFactory.getLogger(DeviceTrust::class.java)
     private val MAPPER = JsonMapper.builder().build()
   }
 }

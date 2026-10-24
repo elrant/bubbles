@@ -9,6 +9,7 @@ import team.elrant.bubbles.ui.components.confirmExitDialog
 import team.elrant.bubbles.ui.components.createWindow
 import team.elrant.bubbles.ui.contacts.contactListScreen
 import team.elrant.bubbles.ui.conversation.conversationScreen
+import team.elrant.bubbles.ui.encryption.encryptionScreen
 import team.elrant.bubbles.ui.settings.settingsScreen
 import team.elrant.bubbles.ui.signin.signInScreen
 import java.awt.Dimension
@@ -32,6 +33,7 @@ private val CONVERSATION_WINDOW_MIN_SIZE = Dimension(480, 360)
 fun showBubbles(bubbles: Bubbles) {
   val confirmExit = mutableStateOf(false)
   val showSettings = mutableStateOf(false)
+  val showEncryption = mutableStateOf(false)
   val openSettings = { showSettings.value = true }
   createWindow(
     title = "Bubbles",
@@ -42,8 +44,16 @@ fun showBubbles(bubbles: Bubbles) {
   ) {
     val user = bubbles.user
     when {
-      showSettings.value -> settingsScreen(bubbles, onBack = { showSettings.value = false })
+      showEncryption.value -> encryptionScreen(bubbles, onBack = { showEncryption.value = false })
+
+      showSettings.value -> settingsScreen(
+        bubbles,
+        onBack = { showSettings.value = false },
+        onOpenEncryption = { showEncryption.value = true },
+      )
+
       user == null -> signInScreen(bubbles, onOpenSettings = openSettings)
+
       else -> contactListScreen(bubbles, user, onOpenSettings = openSettings)
     }
     if (confirmExit.value) {
