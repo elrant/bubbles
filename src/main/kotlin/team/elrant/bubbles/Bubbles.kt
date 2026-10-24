@@ -48,6 +48,9 @@ class Bubbles(accounts: AccountStore = AccountStore(), settingsStore: SettingsSt
   /** The settings and the "Remember me" address. */
   val preferences = Preferences(accounts, settingsStore, scope)
 
+  /** OMEMO fingerprints and trust of the signed-in account and its contacts. */
+  val omemoKeys = OmemoKeys { user }
+
   /** The signed-in account, or `null` while on the sign-in screen. */
   var user by mutableStateOf<ConnectedUser?>(null)
     private set
@@ -122,6 +125,7 @@ class Bubbles(accounts: AccountStore = AccountStore(), settingsStore: SettingsSt
         scope.launch { if (user === source) receive(from, body, encrypted) }
       },
       onRosterChanged = { source -> scope.launch { if (user === source) updateContacts(source) } },
+      requireApproval = { preferences.settings.requireDeviceApproval },
     )
     connect(connected, status)
 

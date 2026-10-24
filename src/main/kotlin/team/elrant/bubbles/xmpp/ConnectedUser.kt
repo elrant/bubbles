@@ -1,5 +1,6 @@
 package team.elrant.bubbles.xmpp
 
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.jivesoftware.smack.ConnectionConfiguration
 import org.jivesoftware.smack.SmackException
 import org.jivesoftware.smack.XMPPException
@@ -21,9 +22,12 @@ import org.jivesoftware.smackx.omemo.element.OmemoElement
 import org.jivesoftware.smackx.omemo.exceptions.CorruptedOmemoKeyException
 import org.jivesoftware.smackx.omemo.exceptions.CryptoFailedException
 import org.jivesoftware.smackx.omemo.exceptions.UndecidedOmemoIdentityException
+import org.jivesoftware.smackx.omemo.internal.OmemoDevice
 import org.jivesoftware.smackx.omemo.listener.OmemoMessageListener
 import org.jivesoftware.smackx.omemo.signal.SignalFileBasedOmemoStore
 import org.jivesoftware.smackx.omemo.signal.SignalOmemoService
+import org.jivesoftware.smackx.omemo.trust.OmemoFingerprint
+import org.jivesoftware.smackx.omemo.trust.TrustState
 import org.jivesoftware.smackx.omemo.util.OmemoConstants
 import org.jivesoftware.smackx.pubsub.PubSubException
 import org.jivesoftware.smackx.vcardtemp.VCardManager
@@ -32,10 +36,12 @@ import org.jxmpp.jid.Jid
 import org.jxmpp.jid.impl.JidCreate
 import org.slf4j.LoggerFactory
 import team.elrant.bubbles.model.Contact
+import team.elrant.bubbles.model.OmemoIdentity
 import team.elrant.bubbles.model.Status
 import team.elrant.bubbles.store.omemoDirectory
 import java.io.IOException
 import java.net.InetAddress
+import java.security.Security
 import java.security.cert.CertificateParsingException
 import java.security.cert.X509Certificate
 import javax.net.ssl.SSLPeerUnverifiedException
@@ -53,6 +59,8 @@ import javax.net.ssl.SSLSession
  * @param onMessage invoked for every incoming chat message that has a body, with this connection as
  *   `source`; `encrypted` tells whether it arrived OMEMO-encrypted.
  * @param onRosterChanged invoked with this connection when roster entries or contact presences change.
+ * @param requireApproval whether OMEMO devices not seen before must be approved instead of trusted on first use;
+ *   read whenever a device turns up.
  */
 class ConnectedUser(
   val username: String,
@@ -62,12 +70,14 @@ class ConnectedUser(
     { _, _, _, _ ->
     },
   private val onRosterChanged: (source: ConnectedUser) -> Unit = {},
+  private val requireApproval: () -> Boolean = { false },
 ) {
   private var connection: XMPPTCPConnection? = null
   private var chat: ChatManager? = null
   private var roster: Roster? = null
   private var vCards: VCardManager? = null
   private var omemo: OmemoManager? = null
+  private var trust: DeviceTrust? = null
 
   /** The account's bare JID, `username@serviceName`. */
   val address: String get() = "$username@$serviceName"
@@ -135,7 +145,9 @@ class ConnectedUser(
     (SignalOmemoService.getInstance() as SignalOmemoService).omemoStoreBackend =
       SignalFileBasedOmemoStore(omemoDirectory(address).toFile())
     OmemoManager.getInstanceFor(conn).also { manager ->
-      manager.setTrustCallback(TofuTrust(omemoDirectory(address).resolve("trust.json")))
+      val deviceTrust = DeviceTrust(omemoDirectory(address).resolve("trust.json"), requireApproval)
+      trust = deviceTrust
+      manager.setTrustCallback(deviceTrust)
       manager.addOmemoMessageListener(object : OmemoMessageListener {
         override fun onOmemoMessageReceived(stanza: Stanza, decrypted: OmemoMessage.Received) {
           val body = decrypted.body ?: return
@@ -277,6 +289,45 @@ class ConnectedUser(
   }
 
   /**
+   * Our own OMEMO device and its fingerprint; `null` if OMEMO isn't running. Blocking. Throws if the keys can't be
+   * read.
+   */
+  fun ownIdentity(): OmemoIdentity? {
+    val manager = omemo ?: return null
+    return OmemoIdentity(
+      jid, manager.deviceId, manager.ownFingerprint.toString(), OmemoIdentity.Trust.Trusted,
+    )
+  }
+
+  /**
+   * The OMEMO devices of [contact] (or of another of our own devices if it is [jid]) with their fingerprints and
+   * trust. Empty if OMEMO isn't running. Blocking, and contacts' bundles are fetched. Throws if that fails.
+   */
+  fun identities(contact: BareJid): List<OmemoIdentity> {
+    val manager = omemo
+    val decisions = trust
+    if (manager == null || decisions == null) return emptyList()
+    return manager.getActiveFingerprints(contact).map { (device, fingerprint) ->
+      OmemoIdentity(
+        contact, device.deviceId, fingerprint.toString(),
+        when (decisions.peek(device, fingerprint)) {
+          TrustState.trusted -> OmemoIdentity.Trust.Trusted
+          TrustState.untrusted -> OmemoIdentity.Trust.Untrusted
+          TrustState.undecided -> OmemoIdentity.Trust.Undecided
+        },
+      )
+    }.sortedBy { it.deviceId }
+  }
+
+  /** Trusts or distrusts [identity] from now on. Does nothing if OMEMO isn't running. */
+  fun setTrusted(identity: OmemoIdentity, trusted: Boolean) {
+    val manager = omemo ?: return
+    val device = OmemoDevice(identity.jid, identity.deviceId)
+    val fingerprint = OmemoFingerprint(identity.fingerprint)
+    if (trusted) manager.trustOmemoIdentity(device, fingerprint) else manager.distrustOmemoIdentity(device, fingerprint)
+  }
+
+  /**
    * The vCard (XEP-0054) photo of [contact], or of our own account if it is [jid]; `null` if they
    * have no vCard or no photo, or before [initializeConnection]. Blocking. Throws if the request fails.
    */
@@ -308,6 +359,8 @@ class ConnectedUser(
     // Smack's SASL login needs a Base64 encoder, normally registered by smack-java11, which isn't a
     // dependency; back it with the JDK's.
     init {
+      // OMEMO's AES/GCM cipher needs a provider that accepts an IvParameterSpec, which the JDK's doesn't.
+      Security.insertProviderAt(BouncyCastleProvider(), 1)
       Base64.setEncoder(object : Base64.Encoder {
         private val encoder = java.util.Base64.getEncoder()
         private val decoder = java.util.Base64.getDecoder()

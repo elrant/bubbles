@@ -51,10 +51,11 @@ import team.elrant.bubbles.ui.theme.accentColor
  *
  * @param bubbles app state whose settings are edited.
  * @param onBack called by the Back button.
+ * @param onOpenEncryption called by the button that opens the OMEMO key management; shown only when signed in.
  * @param modifier applied to the screen.
  */
 @Composable
-fun settingsScreen(bubbles: Bubbles, onBack: () -> Unit, modifier: Modifier = Modifier) {
+fun settingsScreen(bubbles: Bubbles, onBack: () -> Unit, onOpenEncryption: () -> Unit, modifier: Modifier = Modifier) {
   val settings = bubbles.preferences.settings
   val update = bubbles.preferences::update
   Surface(modifier.fillMaxSize()) {
@@ -72,7 +73,7 @@ fun settingsScreen(bubbles: Bubbles, onBack: () -> Unit, modifier: Modifier = Mo
           onForget = bubbles.preferences::forgetAddress,
         )
         HorizontalDivider()
-        privacySection(settings, update)
+        privacySection(settings, update, canManageKeys = bubbles.user != null, onOpenEncryption = onOpenEncryption)
         notificationSection(settings, update)
         HorizontalDivider()
         chatSection(settings, update)
@@ -148,13 +149,23 @@ private fun accountSection(savedAddress: String?, signedInAs: String?, onForget:
   }
 }
 
-/** Whether outgoing messages are encrypted. */
+/** Whether outgoing messages are encrypted, and how new OMEMO devices are treated. */
 @Composable
-private fun privacySection(settings: Settings, update: ((Settings) -> Settings) -> Unit) {
+private fun privacySection(
+  settings: Settings,
+  update: ((Settings) -> Settings) -> Unit,
+  canManageKeys: Boolean,
+  onOpenEncryption: () -> Unit,
+) {
   section("Privacy") {
     toggle("Encrypt messages with OMEMO when the contact supports it", settings.encryptMessages) { on ->
       update { it.copy(encryptMessages = on) }
     }
+    toggle("Ask before trusting a contact's new OMEMO device", settings.requireDeviceApproval) { on ->
+      update { it.copy(requireDeviceApproval = on) }
+    }
+    OutlinedButton(onClick = onOpenEncryption, enabled = canManageKeys) { Text("Manage OMEMO keys…") }
+    if (!canManageKeys) Text("Sign in to manage keys.", style = MaterialTheme.typography.labelSmall)
   }
 }
 
