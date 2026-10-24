@@ -27,30 +27,30 @@ import androidx.compose.ui.unit.round
  */
 @Composable
 fun contextMenuBox(
-  menu: @Composable ColumnScope.(close: () -> Unit) -> Unit,
-  modifier: Modifier = Modifier,
-  content: @Composable () -> Unit,
+    menu: @Composable ColumnScope.(close: () -> Unit) -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
 ) {
-  var position by remember { mutableStateOf<Offset?>(null) }
-  Box(
-    modifier.pointerInput(Unit) {
-      awaitPointerEventScope {
-        while (true) {
-          val event = awaitPointerEvent()
-          if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed) {
-            position = event.changes.first().position
-            event.changes.forEach { it.consume() }
-          }
+    var position by remember { mutableStateOf<Offset?>(null) }
+    Box(
+        modifier.pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent()
+                    if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed) {
+                        position = event.changes.first().position
+                        event.changes.forEach { it.consume() }
+                    }
+                }
+            }
+        },
+    ) {
+        content()
+        // A zero-size anchor at the pointer, so the menu opens where the user clicked.
+        Box(Modifier.offset { position?.round() ?: Offset.Zero.round() }) {
+            DropdownMenu(expanded = position != null, onDismissRequest = { position = null }) {
+                menu { position = null }
+            }
         }
-      }
-    },
-  ) {
-    content()
-    // A zero-size anchor at the pointer, so the menu opens where the user clicked.
-    Box(Modifier.offset { position?.round() ?: Offset.Zero.round() }) {
-      DropdownMenu(expanded = position != null, onDismissRequest = { position = null }) {
-        menu { position = null }
-      }
     }
-  }
 }

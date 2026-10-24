@@ -60,28 +60,28 @@ import team.elrant.bubbles.xmpp.ConnectedUser
  */
 @Composable
 fun contactListScreen(
-  bubbles: Bubbles,
-  user: ConnectedUser,
-  onOpenSettings: () -> Unit,
-  modifier: Modifier = Modifier,
+    bubbles: Bubbles,
+    user: ConnectedUser,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-  var query by remember { mutableStateOf("") }
-  Surface(modifier.fillMaxSize()) {
-    Column {
-      selfHeader(bubbles, user, onOpenSettings)
-      OutlinedTextField(
-        query, { query = it },
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-        placeholder = { Text("Search contacts…") }, singleLine = true,
-      )
-      HorizontalDivider()
-      contactList(
-        bubbles,
-        groupContacts(bubbles.contacts, query, bubbles.preferences.settings.groupOrder),
-        emptyText = if (query.isBlank()) "No contacts yet" else "No matches",
-      )
+    var query by remember { mutableStateOf("") }
+    Surface(modifier.fillMaxSize()) {
+        Column {
+            selfHeader(bubbles, user, onOpenSettings)
+            OutlinedTextField(
+                query, { query = it },
+                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                placeholder = { Text("Search contacts…") }, singleLine = true,
+            )
+            HorizontalDivider()
+            contactList(
+                bubbles,
+                groupContacts(bubbles.contacts, query, bubbles.preferences.settings.groupOrder),
+                emptyText = if (query.isBlank()) "No contacts yet" else "No matches",
+            )
+        }
     }
-  }
 }
 
 /**
@@ -90,44 +90,44 @@ fun contactListScreen(
  */
 @Composable
 private fun selfHeader(bubbles: Bubbles, user: ConnectedUser, onOpenSettings: () -> Unit) {
-  val editMessage = remember { FocusRequester() }
-  contextMenuBox(
-    menu = { close ->
-      menuItem("Edit personal message", onClose = close, onClick = { editMessage.requestFocus() })
-      HorizontalDivider()
-      statusMenuItems(
-        onSelect = { bubbles.changePresence(status = it) },
-        onClose = close,
-        onOpenSettings = onOpenSettings,
-        onSignOut = bubbles::signOut,
-      )
-    },
-  ) {
-    Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
-      Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        displayPicture(user.username, bubbles.status, 64.dp, picture = bubbles.avatar(user.jid))
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-          statusSelector(
-            onSelect = { bubbles.changePresence(status = it) },
-            onOpenSettings = onOpenSettings,
-            onSignOut = bubbles::signOut,
-          ) {
-            Text(
-              "${user.username} (${bubbles.status.label})",
-              style = MaterialTheme.typography.titleMedium,
-              maxLines = 1, overflow = TextOverflow.Ellipsis,
+    val editMessage = remember { FocusRequester() }
+    contextMenuBox(
+        menu = { close ->
+            menuItem("Edit personal message", onClose = close, onClick = { editMessage.requestFocus() })
+            HorizontalDivider()
+            statusMenuItems(
+                onSelect = { bubbles.changePresence(status = it) },
+                onClose = close,
+                onOpenSettings = onOpenSettings,
+                onSignOut = bubbles::signOut,
             )
-          }
-          personalMessageField(
-            bubbles.personalMessage,
-            { bubbles.changePresence(personalMessage = it) },
-            Modifier.padding(start = 4.dp, top = 2.dp).focusRequester(editMessage),
-          )
+        },
+    ) {
+        Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
+            Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                displayPicture(user.username, bubbles.status, 64.dp, picture = bubbles.avatar(user.jid))
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    statusSelector(
+                        onSelect = { bubbles.changePresence(status = it) },
+                        onOpenSettings = onOpenSettings,
+                        onSignOut = bubbles::signOut,
+                    ) {
+                        Text(
+                            "${user.username} (${bubbles.status.label})",
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    personalMessageField(
+                        bubbles.personalMessage,
+                        { bubbles.changePresence(personalMessage = it) },
+                        Modifier.padding(start = 4.dp, top = 2.dp).focusRequester(editMessage),
+                    )
+                }
+            }
         }
-      }
     }
-  }
 }
 
 /**
@@ -136,29 +136,31 @@ private fun selfHeader(bubbles: Bubbles, user: ConnectedUser, onOpenSettings: ()
  */
 @Composable
 private fun personalMessageField(current: String, onCommit: (String) -> Unit, modifier: Modifier = Modifier) {
-  var draft by remember(current) { mutableStateOf(current) }
-  val focus = LocalFocusManager.current
-  val style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
-  BasicTextField(
-    draft, { draft = it },
-    modifier
-      .fillMaxWidth()
-      .onFocusChanged { if (!it.isFocused && draft.trim() != current) onCommit(draft) }
-      .onPreviewKeyEvent {
-        val enter = it.key == Key.Enter
-        if (enter) focus.clearFocus()
-        enter
-      },
-    singleLine = true,
-    textStyle = style,
-    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-    decorationBox = { field ->
-      Box {
-        if (draft.isEmpty()) Text("<Share a quick message>", style = style.copy(color = style.color.copy(alpha = 0.6f)))
-        field()
-      }
-    },
-  )
+    var draft by remember(current) { mutableStateOf(current) }
+    val focus = LocalFocusManager.current
+    val style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+    BasicTextField(
+        draft, { draft = it },
+        modifier
+            .fillMaxWidth()
+            .onFocusChanged { if (!it.isFocused && draft.trim() != current) onCommit(draft) }
+            .onPreviewKeyEvent {
+                val enter = it.key == Key.Enter
+                if (enter) focus.clearFocus()
+                enter
+            },
+        singleLine = true,
+        textStyle = style,
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        decorationBox = { field ->
+            Box {
+                if (draft.isEmpty()) {
+                    Text("<Share a quick message>", style = style.copy(color = style.color.copy(alpha = 0.6f)))
+                }
+                field()
+            }
+        },
+    )
 }
 
 /**
@@ -168,58 +170,58 @@ private fun personalMessageField(current: String, onCommit: (String) -> Unit, mo
  */
 @Composable
 private fun contactList(bubbles: Bubbles, groups: List<ContactGroup>, emptyText: String) {
-  val collapsed = remember { mutableStateMapOf<String, Boolean>() }
-  var selected by remember { mutableStateOf<BareJid?>(null) }
-  var newGroupFor by remember { mutableStateOf<DragItem.ContactItem?>(null) }
-  val drag = remember { ContactDragState() }
-  val drop = { item: DragItem, target: ContactGroup -> onDrop(bubbles, item, target) }
+    val collapsed = remember { mutableStateMapOf<String, Boolean>() }
+    var selected by remember { mutableStateOf<BareJid?>(null) }
+    var newGroupFor by remember { mutableStateOf<DragItem.ContactItem?>(null) }
+    val drag = remember { ContactDragState() }
+    val drop = { item: DragItem, target: ContactGroup -> onDrop(bubbles, item, target) }
 
-  if (groups.isEmpty()) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-      Text(emptyText, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-    return
-  }
-
-  Box(Modifier.fillMaxSize().dragOverlay(drag)) {
-    LazyColumn(Modifier.fillMaxSize()) {
-      for (group in groups) {
-        val name = group.name
-        val isCollapsed = collapsed[name] == true
-        item(key = groupKey(name)) {
-          groupHeaderEntry(
-            group, isCollapsed, drag, drop,
-            onToggle = { collapsed[name] = !isCollapsed },
-            onCollapseAll = { collapse -> groups.forEach { collapsed[it.name] = collapse } },
-          )
+    if (groups.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(emptyText, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        if (!isCollapsed) {
-          items(group.contacts, key = { contactKey(name, it.jid) }) { contact ->
-            contactEntry(
-              bubbles, contact, group, drag, drop,
-              selected = contact.jid == selected,
-              onSelect = { selected = contact.jid },
-              onNewGroup = { newGroupFor = DragItem.ContactItem(contact, group) },
-            )
-          }
-        }
-      }
+        return
     }
-    dragGhost(drag)
-  }
 
-  newGroupFor?.let { item ->
-    textPromptDialog(
-      title = "New group",
-      label = "Move ${item.contact.displayName} to the group",
-      confirmText = "Create",
-      onConfirm = { name ->
-        newGroupFor = null
-        bubbles.moveContact(item.contact.jid, rosterName(item.from), name)
-      },
-      onDismiss = { newGroupFor = null },
-    )
-  }
+    Box(Modifier.fillMaxSize().dragOverlay(drag)) {
+        LazyColumn(Modifier.fillMaxSize()) {
+            for (group in groups) {
+                val name = group.name
+                val isCollapsed = collapsed[name] == true
+                item(key = groupKey(name)) {
+                    groupHeaderEntry(
+                        group, isCollapsed, drag, drop,
+                        onToggle = { collapsed[name] = !isCollapsed },
+                        onCollapseAll = { collapse -> groups.forEach { collapsed[it.name] = collapse } },
+                    )
+                }
+                if (!isCollapsed) {
+                    items(group.contacts, key = { contactKey(name, it.jid) }) { contact ->
+                        contactEntry(
+                            bubbles, contact, group, drag, drop,
+                            selected = contact.jid == selected,
+                            onSelect = { selected = contact.jid },
+                            onNewGroup = { newGroupFor = DragItem.ContactItem(contact, group) },
+                        )
+                    }
+                }
+            }
+        }
+        dragGhost(drag)
+    }
+
+    newGroupFor?.let { item ->
+        textPromptDialog(
+            title = "New group",
+            label = "Move ${item.contact.displayName} to the group",
+            confirmText = "Create",
+            onConfirm = { name ->
+                newGroupFor = null
+                bubbles.moveContact(item.contact.jid, rosterName(item.from), name)
+            },
+            onDismiss = { newGroupFor = null },
+        )
+    }
 }
 
 /**
@@ -228,30 +230,30 @@ private fun contactList(bubbles: Bubbles, groups: List<ContactGroup>, emptyText:
  */
 @Composable
 private fun groupHeaderEntry(
-  group: ContactGroup,
-  collapsed: Boolean,
-  drag: ContactDragState,
-  onDrop: (DragItem, ContactGroup) -> Unit,
-  onToggle: () -> Unit,
-  onCollapseAll: (Boolean) -> Unit,
+    group: ContactGroup,
+    collapsed: Boolean,
+    drag: ContactDragState,
+    onDrop: (DragItem, ContactGroup) -> Unit,
+    onToggle: () -> Unit,
+    onCollapseAll: (Boolean) -> Unit,
 ) {
-  val key = groupKey(group.name)
-  DisposableEffect(key) { onDispose { drag.forget(key) } }
-  contextMenuBox(
-    menu = { close ->
-      menuItem("Collapse all", onClose = close, onClick = { onCollapseAll(true) })
-      menuItem("Expand all", onClose = close, onClick = { onCollapseAll(false) })
-    },
-  ) {
-    groupHeader(
-      group,
-      collapsed,
-      highlighted = drag.target?.name == group.name && canDrop(drag.dragged, drag.target),
-      Modifier
-        .dragRow(drag, key, group, DragItem.GroupItem(group).takeIf { canDrag(group) }, onDrop)
-        .clickable(onClick = onToggle),
-    )
-  }
+    val key = groupKey(group.name)
+    DisposableEffect(key) { onDispose { drag.forget(key) } }
+    contextMenuBox(
+        menu = { close ->
+            menuItem("Collapse all", onClose = close, onClick = { onCollapseAll(true) })
+            menuItem("Expand all", onClose = close, onClick = { onCollapseAll(false) })
+        },
+    ) {
+        groupHeader(
+            group,
+            collapsed,
+            highlighted = drag.target?.name == group.name && canDrop(drag.dragged, drag.target),
+            Modifier
+                .dragRow(drag, key, group, DragItem.GroupItem(group).takeIf { canDrag(group) }, onDrop)
+                .clickable(onClick = onToggle),
+        )
+    }
 }
 
 /**
@@ -260,35 +262,35 @@ private fun groupHeaderEntry(
  */
 @Composable
 private fun contactEntry(
-  bubbles: Bubbles,
-  contact: Contact,
-  group: ContactGroup,
-  drag: ContactDragState,
-  onDrop: (DragItem, ContactGroup) -> Unit,
-  selected: Boolean,
-  onSelect: () -> Unit,
-  onNewGroup: () -> Unit,
+    bubbles: Bubbles,
+    contact: Contact,
+    group: ContactGroup,
+    drag: ContactDragState,
+    onDrop: (DragItem, ContactGroup) -> Unit,
+    selected: Boolean,
+    onSelect: () -> Unit,
+    onNewGroup: () -> Unit,
 ) {
-  val key = contactKey(group.name, contact.jid)
-  DisposableEffect(key) { onDispose { drag.forget(key) } }
-  contextMenuBox(
-    menu = { close ->
-      menuItem("Open conversation", onClose = close, onClick = { bubbles.openConversation(contact.jid) })
-      menuItem("Copy address", onClose = close, onClick = { copyToClipboard(contact.jid.toString()) })
-      HorizontalDivider()
-      menuItem("New group…", onClose = close, onClick = onNewGroup)
-    },
-  ) {
-    contactRow(
-      contact,
-      picture = bubbles.avatar(contact.jid),
-      unread = bubbles.unread[contact.jid] ?: 0,
-      selected = selected,
-      Modifier
-        .dragRow(drag, key, group, DragItem.ContactItem(contact, group), onDrop)
-        .combinedClickable(onClick = onSelect, onDoubleClick = { bubbles.openConversation(contact.jid) }),
-    )
-  }
+    val key = contactKey(group.name, contact.jid)
+    DisposableEffect(key) { onDispose { drag.forget(key) } }
+    contextMenuBox(
+        menu = { close ->
+            menuItem("Open conversation", onClose = close, onClick = { bubbles.openConversation(contact.jid) })
+            menuItem("Copy address", onClose = close, onClick = { copyToClipboard(contact.jid.toString()) })
+            HorizontalDivider()
+            menuItem("New group…", onClose = close, onClick = onNewGroup)
+        },
+    ) {
+        contactRow(
+            contact,
+            picture = bubbles.avatar(contact.jid),
+            unread = bubbles.unread[contact.jid] ?: 0,
+            selected = selected,
+            Modifier
+                .dragRow(drag, key, group, DragItem.ContactItem(contact, group), onDrop)
+                .combinedClickable(onClick = onSelect, onDoubleClick = { bubbles.openConversation(contact.jid) }),
+        )
+    }
 }
 
 /** Lazy-list and drag key of [group]'s header. */
@@ -305,10 +307,10 @@ private fun canDrag(group: ContactGroup) = group.kind == ContactGroup.Kind.Roste
  * other group but themselves.
  */
 private fun canDrop(item: DragItem?, target: ContactGroup?): Boolean = when {
-  item == null || target == null -> false
-  item is DragItem.ContactItem -> target.kind != ContactGroup.Kind.Offline && target.name != item.from.name
-  item is DragItem.GroupItem -> target.name != item.group.name
-  else -> false
+    item == null || target == null -> false
+    item is DragItem.ContactItem -> target.kind != ContactGroup.Kind.Offline && target.name != item.from.name
+    item is DragItem.GroupItem -> target.name != item.group.name
+    else -> false
 }
 
 /** The roster group name of [group], or `null` for a built-in group. */
@@ -319,21 +321,21 @@ private fun rosterName(group: ContactGroup): String? = group.name.takeIf { group
  * dragged group placed before [target] (at the end when dropped on a built-in group).
  */
 private fun onDrop(bubbles: Bubbles, item: DragItem, target: ContactGroup) {
-  if (!canDrop(item, target)) return
-  when (item) {
-    is DragItem.ContactItem -> {
-      val from = rosterName(item.from)
-      val to = rosterName(target)
-      if (from != null || to != null) bubbles.moveContact(item.contact.jid, from, to)
-    }
+    if (!canDrop(item, target)) return
+    when (item) {
+        is DragItem.ContactItem -> {
+            val from = rosterName(item.from)
+            val to = rosterName(target)
+            if (from != null || to != null) bubbles.moveContact(item.contact.jid, from, to)
+        }
 
-    is DragItem.GroupItem -> {
-      val order = rosterGroupOrder(bubbles).filter { it != item.group.name }.toMutableList()
-      val index = order.indexOf(target.name).takeIf { it >= 0 } ?: order.size
-      order.add(index, item.group.name)
-      bubbles.preferences.update { it.copy(groupOrder = order) }
+        is DragItem.GroupItem -> {
+            val order = rosterGroupOrder(bubbles).filter { it != item.group.name }.toMutableList()
+            val index = order.indexOf(target.name).takeIf { it >= 0 } ?: order.size
+            order.add(index, item.group.name)
+            bubbles.preferences.update { it.copy(groupOrder = order) }
+        }
     }
-  }
 }
 
 /**
@@ -341,56 +343,58 @@ private fun onDrop(bubbles: Bubbles, item: DragItem, target: ContactGroup) {
  * shown under "Offline"), so their place is kept.
  */
 private fun rosterGroupOrder(bubbles: Bubbles): List<String> {
-  val all = bubbles.contacts.flatMap { it.groups }.toSet()
-  val known = bubbles.preferences.settings.groupOrder.filter { it in all }
-  return known + (all - known.toSet()).sortedWith(String.CASE_INSENSITIVE_ORDER)
+    val all = bubbles.contacts.flatMap { it.groups }.toSet()
+    val known = bubbles.preferences.settings.groupOrder.filter { it in all }
+    return known + (all - known.toSet()).sortedWith(String.CASE_INSENSITIVE_ORDER)
 }
 
 /** A group's heading with its member count; [highlighted] while something can be dropped on it. */
 @Composable
 private fun groupHeader(group: ContactGroup, collapsed: Boolean, highlighted: Boolean, modifier: Modifier = Modifier) {
-  Text(
-    "${if (collapsed) "▸" else "▾"} ${group.name} (${group.contacts.size})",
-    modifier
-      .fillMaxWidth()
-      .background(if (highlighted) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)
-      .padding(horizontal = 12.dp, vertical = 6.dp),
-    style = MaterialTheme.typography.labelLarge,
-    color = MaterialTheme.colorScheme.primary,
-  )
+    Text(
+        "${if (collapsed) "▸" else "▾"} ${group.name} (${group.contacts.size})",
+        modifier
+            .fillMaxWidth()
+            .background(
+                if (highlighted) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+            )
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary,
+    )
 }
 
 /** Display picture, name and personal message of one contact; [unread] messages are counted after the name. */
 @Composable
 private fun contactRow(
-  contact: Contact,
-  picture: ImageBitmap?,
-  unread: Int,
-  selected: Boolean,
-  modifier: Modifier = Modifier,
+    contact: Contact,
+    picture: ImageBitmap?,
+    unread: Int,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
 ) {
-  Row(
-    modifier
-      .fillMaxWidth()
-      .background(if (selected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface)
-      .padding(start = 24.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
-    verticalAlignment = Alignment.CenterVertically,
-  ) {
-    displayPicture(contact.displayName, contact.status, 32.dp, picture = picture)
-    Spacer(Modifier.width(10.dp))
-    Text(
-      if (unread > 0) "${contact.displayName} ($unread)" else contact.displayName,
-      style = MaterialTheme.typography.bodyMedium,
-      fontWeight = if (unread > 0) FontWeight.Bold else null,
-      maxLines = 1, overflow = TextOverflow.Ellipsis,
-    )
-    contact.personalMessage?.let {
-      Text(
-        " - $it",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1, overflow = TextOverflow.Ellipsis,
-      )
+    Row(
+        modifier
+            .fillMaxWidth()
+            .background(if (selected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface)
+            .padding(start = 24.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        displayPicture(contact.displayName, contact.status, 32.dp, picture = picture)
+        Spacer(Modifier.width(10.dp))
+        Text(
+            if (unread > 0) "${contact.displayName} ($unread)" else contact.displayName,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (unread > 0) FontWeight.Bold else null,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+        )
+        contact.personalMessage?.let {
+            Text(
+                " - $it",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
-  }
 }

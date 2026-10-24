@@ -37,28 +37,28 @@ private val logger = LoggerFactory.getLogger("team.elrant.bubbles.ui.components.
  * @param content the window's contents.
  */
 fun createWindow(
-  title: String,
-  size: Dimension,
-  minimumSize: Dimension,
-  settings: () -> Settings,
-  onCloseRequest: () -> Unit,
-  content: @Composable () -> Unit,
+    title: String,
+    size: Dimension,
+    minimumSize: Dimension,
+    settings: () -> Settings,
+    onCloseRequest: () -> Unit,
+    content: @Composable () -> Unit,
 ): JFrame = JFrame(title).apply {
-  defaultCloseOperation = WindowConstants.DO_NOTHING_ON_CLOSE
-  addWindowListener(object : WindowAdapter() {
-    override fun windowClosing(e: WindowEvent) = onCloseRequest()
-  })
-  contentPane.add(
-    ComposePanel().apply {
-      setContent {
-        val current = settings()
-        bubblesTheme(current.flavor, current.accent, content)
-      }
-    },
-  )
-  this.size = size
-  this.minimumSize = minimumSize
-  setLocationRelativeTo(null)
+    defaultCloseOperation = WindowConstants.DO_NOTHING_ON_CLOSE
+    addWindowListener(object : WindowAdapter() {
+        override fun windowClosing(e: WindowEvent) = onCloseRequest()
+    })
+    contentPane.add(
+        ComposePanel().apply {
+            setContent {
+                val current = settings()
+                bubblesTheme(current.flavor, current.accent, content)
+            }
+        },
+    )
+    this.size = size
+    this.minimumSize = minimumSize
+    setLocationRelativeTo(null)
 }
 
 /**
@@ -79,43 +79,43 @@ fun createWindow(
  */
 @Composable
 fun bubblesWindow(
-  title: String,
-  size: Dimension,
-  minimumSize: Dimension,
-  settings: Settings,
-  onCloseRequest: () -> Unit,
-  attention: Int = 0,
-  onFocusChange: (Boolean) -> Unit = {},
-  content: @Composable () -> Unit,
+    title: String,
+    size: Dimension,
+    minimumSize: Dimension,
+    settings: Settings,
+    onCloseRequest: () -> Unit,
+    attention: Int = 0,
+    onFocusChange: (Boolean) -> Unit = {},
+    content: @Composable () -> Unit,
 ) {
-  val currentContent by rememberUpdatedState(content)
-  val currentOnFocusChange by rememberUpdatedState(onFocusChange)
-  val currentOnCloseRequest by rememberUpdatedState(onCloseRequest)
-  val currentSettings by rememberUpdatedState(settings)
-  val frame = remember {
-    createWindow(title, size, minimumSize, { currentSettings }, { currentOnCloseRequest() }) { currentContent() }
-  }
-  val initialAttention = remember { attention }
-
-  SideEffect { frame.title = title }
-  DisposableEffect(frame) {
-    val focusListener = object : WindowAdapter() {
-      override fun windowGainedFocus(e: WindowEvent) = currentOnFocusChange(true)
-
-      override fun windowLostFocus(e: WindowEvent) = currentOnFocusChange(false)
+    val currentContent by rememberUpdatedState(content)
+    val currentOnFocusChange by rememberUpdatedState(onFocusChange)
+    val currentOnCloseRequest by rememberUpdatedState(onCloseRequest)
+    val currentSettings by rememberUpdatedState(settings)
+    val frame = remember {
+        createWindow(title, size, minimumSize, { currentSettings }, { currentOnCloseRequest() }) { currentContent() }
     }
-    frame.addWindowFocusListener(focusListener)
-    frame.isVisible = true
-    onDispose {
-      frame.removeWindowFocusListener(focusListener)
-      frame.dispose()
+    val initialAttention = remember { attention }
+
+    SideEffect { frame.title = title }
+    DisposableEffect(frame) {
+        val focusListener = object : WindowAdapter() {
+            override fun windowGainedFocus(e: WindowEvent) = currentOnFocusChange(true)
+
+            override fun windowLostFocus(e: WindowEvent) = currentOnFocusChange(false)
+        }
+        frame.addWindowFocusListener(focusListener)
+        frame.isVisible = true
+        onDispose {
+            frame.removeWindowFocusListener(focusListener)
+            frame.dispose()
+        }
     }
-  }
-  LaunchedEffect(attention) {
-    if (attention == initialAttention) return@LaunchedEffect
-    if (settings.raiseOnMessage) frame.toFront()
-    if (settings.requestAttention) requestUserAttention(frame)
-  }
+    LaunchedEffect(attention) {
+        if (attention == initialAttention) return@LaunchedEffect
+        if (settings.raiseOnMessage) frame.toFront()
+        if (settings.requestAttention) requestUserAttention(frame)
+    }
 }
 
 /**
@@ -123,11 +123,11 @@ fun bubblesWindow(
  * the toolkit doesn't support it.
  */
 private fun requestUserAttention(window: Window) {
-  val supported = Taskbar.isTaskbarSupported() &&
-    Taskbar.getTaskbar().isSupported(Taskbar.Feature.USER_ATTENTION_WINDOW)
-  if (supported) {
-    Taskbar.getTaskbar().requestWindowUserAttention(window)
-  } else {
-    logger.debug("Requesting window attention is not supported here")
-  }
+    val supported = Taskbar.isTaskbarSupported() &&
+        Taskbar.getTaskbar().isSupported(Taskbar.Feature.USER_ATTENTION_WINDOW)
+    if (supported) {
+        Taskbar.getTaskbar().requestWindowUserAttention(window)
+    } else {
+        logger.debug("Requesting window attention is not supported here")
+    }
 }

@@ -30,7 +30,7 @@ complexity:
     # Bubbles is the app's single state holder; count only its public API.
     ignorePrivate: true
 
-# Formatting (ktlint). Indentation is 2 spaces, as in .editorconfig.
+# Formatting (ktlint). Indentation is 4 spaces, as in .editorconfig.
 ktlint:
   # Duplicate of naming>FunctionNaming.
   FunctionName:
@@ -46,66 +46,66 @@ ktlint:
   MultilineExpressionWrapping:
     active: false
   AnnotationOnSeparateLine:
-    indentSize: 2
+    indentSize: 4
   BinaryExpressionWrapping:
-    indentSize: 2
+    indentSize: 4
   ChainWrapping:
-    indentSize: 2
+    indentSize: 4
   ClassSignature:
-    indentSize: 2
+    indentSize: 4
   CommentWrapping:
-    indentSize: 2
+    indentSize: 4
   ConditionWrapping:
-    indentSize: 2
+    indentSize: 4
   ContextReceiverListWrapping:
-    indentSize: 2
+    indentSize: 4
   ContextReceiverMapping:
-    indentSize: 2
+    indentSize: 4
   EnumWrapping:
-    indentSize: 2
+    indentSize: 4
   ExpressionOperandWrapping:
-    indentSize: 2
+    indentSize: 4
   FunctionExpressionBody:
-    indentSize: 2
+    indentSize: 4
   FunctionLiteral:
-    indentSize: 2
+    indentSize: 4
   FunctionSignature:
-    indentSize: 2
+    indentSize: 4
   IfElseBracing:
-    indentSize: 2
+    indentSize: 4
   IfElseWrapping:
-    indentSize: 2
+    indentSize: 4
   Indentation:
-    indentSize: 2
+    indentSize: 4
   KdocWrapping:
-    indentSize: 2
+    indentSize: 4
   ModifierListSpacing:
-    indentSize: 2
+    indentSize: 4
   MultiLineIfElse:
-    indentSize: 2
+    indentSize: 4
   MultilineLoop:
-    indentSize: 2
+    indentSize: 4
   NoEmptyFirstLineInClassBody:
-    indentSize: 2
+    indentSize: 4
   NoSingleLineBlockComment:
-    indentSize: 2
+    indentSize: 4
   ParameterWrapping:
-    indentSize: 2
+    indentSize: 4
   PropertyWrapping:
-    indentSize: 2
+    indentSize: 4
   SpacingAroundCurly:
-    indentSize: 2
+    indentSize: 4
   StatementWrapping:
-    indentSize: 2
+    indentSize: 4
   StringTemplateIndent:
-    indentSize: 2
+    indentSize: 4
   TryCatchFinallySpacing:
-    indentSize: 2
+    indentSize: 4
   TypeArgumentListSpacing:
-    indentSize: 2
+    indentSize: 4
   TypeParameterListSpacing:
-    indentSize: 2
+    indentSize: 4
   WhenEntryBracing:
-    indentSize: 2
+    indentSize: 4
   Wrapping:
-    indentSize: 2
+    indentSize: 4

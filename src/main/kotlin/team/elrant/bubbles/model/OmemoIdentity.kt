@@ -11,20 +11,20 @@ import org.jxmpp.jid.BareJid
  * @property trust what has been decided about it.
  */
 data class OmemoIdentity(val jid: BareJid, val deviceId: Int, val fingerprint: String, val trust: Trust) {
-  /**
-   * The device as an `xmpp:` URI with its fingerprint (`xmpp:jid?omemo-sid-<id>=<fingerprint>`), the form other OMEMO
-   * clients scan from a QR code to verify it.
-   */
-  val uri: String get() = "xmpp:$jid?omemo-sid-$deviceId=${fingerprint.lowercase()}"
+    /**
+     * The device as an `xmpp:` URI with its fingerprint (`xmpp:jid?omemo-sid-<id>=<fingerprint>`), the form other OMEMO
+     * clients scan from a QR code to verify it.
+     */
+    val uri: String get() = "xmpp:$jid?omemo-sid-$deviceId=${fingerprint.lowercase()}"
 
-  /**
-   * Whether messages are encrypted to a device.
-   *
-   * @property label user-facing name.
-   */
-  enum class Trust(val label: String) {
-    Undecided("Not yet decided"),
-    Trusted("Trusted"),
-    Untrusted("Not trusted"),
-  }
+    /**
+     * Whether messages are encrypted to a device.
+     *
+     * @property label user-facing name.
+     */
+    enum class Trust(val label: String) {
+        Undecided("Not yet decided"),
+        Trusted("Trusted"),
+        Untrusted("Not trusted"),
+    }
 }

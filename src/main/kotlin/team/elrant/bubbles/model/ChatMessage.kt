@@ -18,13 +18,13 @@ import java.time.LocalDateTime
  *   from the server archive) is only shown once; `null` for messages we just sent.
  */
 data class ChatMessage(
-  val body: String,
-  val outgoing: Boolean,
-  val time: LocalDateTime = LocalDateTime.now(),
-  val encrypted: Boolean = false,
-  val failed: Boolean = false,
-  val pending: Boolean = false,
-  val read: Boolean = false,
-  val markable: Boolean = false,
-  val id: String? = null,
+    val body: String,
+    val outgoing: Boolean,
+    val time: LocalDateTime = LocalDateTime.now(),
+    val encrypted: Boolean = false,
+    val failed: Boolean = false,
+    val pending: Boolean = false,
+    val read: Boolean = false,
+    val markable: Boolean = false,
+    val id: String? = null,
 )

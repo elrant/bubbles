@@ -36,181 +36,195 @@ import javax.crypto.spec.SecretKeySpec
  * @param runtimeDirectory the directory holding the working files; defaults to one under `$XDG_RUNTIME_DIR`.
  */
 class OmemoVault(
-  private val account: String,
-  private val vaultFile: Path = omemoConfig().resolve("$account.vault"),
-  private val legacyDirectory: Path = omemoConfig().resolve(account),
-  private val runtimeDirectory: Path = runtimeBase().resolve(account),
+    private val account: String,
+    private val vaultFile: Path = omemoConfig().resolve("$account.vault"),
+    private val legacyDirectory: Path = omemoConfig().resolve(account),
+    private val runtimeDirectory: Path = runtimeBase().resolve(account),
 ) {
-  private var key: ByteArray? = null
+    private var key: ByteArray? = null
 
-  /** The directory the key store works in; valid after [open]. */
-  val directory: Path get() = runtimeDirectory
+    /** The directory the key store works in; valid after [open]. */
+    val directory: Path get() = runtimeDirectory
 
-  /**
-   * Unseals the vault into [directory] (migrating a legacy store, or starting empty) and returns it. Blocking; may
-   * wait for the user to unlock the keyring. Throws [KeyringException] if the keyring can't provide the key, or
-   * [IOException] if the files can't be read or written.
-   */
-  @Synchronized
-  fun open(): Path {
-    val sealing = loadKey()
-    key = sealing
-    resetDirectory()
-    when {
-      Files.exists(vaultFile) -> {
-        unseal(sealing)
-      }
+    /**
+     * Unseals the vault into [directory] (migrating a legacy store, or starting empty) and returns it. Blocking; may
+     * wait for the user to unlock the keyring. Throws [KeyringException] if the keyring can't provide the key, or
+     * [IOException] if the files can't be read or written.
+     */
+    @Synchronized
+    fun open(): Path {
+        val sealing = loadKey()
+        key = sealing
+        resetDirectory()
+        when {
+            Files.exists(vaultFile) -> {
+                unseal(sealing)
+            }
 
-      Files.isDirectory(legacyDirectory) -> {
-        logger.info("Moving the OMEMO keys of {} into the encrypted vault", account)
-        copyTree(legacyDirectory, runtimeDirectory)
-        flush()
-        deleteTree(legacyDirectory)
-      }
-    }
-    return runtimeDirectory
-  }
-
-  /** Seals the current contents of [directory] into the vault. Blocking. Throws [IOException] if that fails. */
-  @Synchronized
-  fun flush() {
-    val sealing = key ?: return
-    val nonce = ByteArray(NONCE_BYTES).also(RANDOM::nextBytes)
-    val sealed = try {
-      cipher(Cipher.ENCRYPT_MODE, sealing, nonce).doFinal(zip(runtimeDirectory))
-    } catch (e: GeneralSecurityException) {
-      throw IOException("Could not encrypt the OMEMO keys: ${e.message}", e)
-    }
-    Files.createDirectories(vaultFile.parent)
-    val temporary = vaultFile.resolveSibling("${vaultFile.fileName}.tmp")
-    Files.write(temporary, MAGIC + nonce + sealed)
-    restrict(temporary, "rw-------")
-    Files.move(temporary, vaultFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-  }
-
-  /** Seals one last time, then removes the working files and forgets the key. */
-  @Synchronized
-  fun close() {
-    try {
-      flush()
-    } catch (e: IOException) {
-      logger.error("Could not save the OMEMO keys of {}: {}", account, e.message)
-    }
-    deleteTree(runtimeDirectory)
-    key = null
-  }
-
-  /** The vault key from the keyring; a new random one, saved there, if there is none yet. */
-  private fun loadKey(): ByteArray = Keyring.open().use { keyring ->
-    keyring.get(account, KEY_KIND)?.takeIf { it.size == KEY_BYTES } ?: ByteArray(KEY_BYTES).also { fresh ->
-      RANDOM.nextBytes(fresh)
-      keyring.put(account, KEY_KIND, "Bubbles OMEMO vault key ($account)", fresh)
-    }
-  }
-
-  /** Unseals the vault into [runtimeDirectory]; a vault that can't be decrypted is set aside and replaced. */
-  private fun unseal(sealing: ByteArray) {
-    val data = Files.readAllBytes(vaultFile)
-    val plain = try {
-      require(data.size > MAGIC.size + NONCE_BYTES && data.copyOf(MAGIC.size).contentEquals(MAGIC)) { "bad header" }
-      val nonce = data.copyOfRange(MAGIC.size, MAGIC.size + NONCE_BYTES)
-      val offset = MAGIC.size + NONCE_BYTES
-      cipher(Cipher.DECRYPT_MODE, sealing, nonce).doFinal(data, offset, data.size - offset)
-    } catch (e: GeneralSecurityException) {
-      return setAside(e)
-    } catch (e: IllegalArgumentException) {
-      return setAside(e)
-    }
-    unzip(plain, runtimeDirectory)
-  }
-
-  /** Keeps an unreadable vault under another name and starts without keys, which creates a new OMEMO device. */
-  private fun setAside(cause: Exception) {
-    val aside = vaultFile.resolveSibling("${vaultFile.fileName}.unreadable-${System.currentTimeMillis()}")
-    logger.error("Cannot decrypt the vault of {} ({}); keeping it as {}, starting fresh", account, cause.message, aside)
-    Files.move(vaultFile, aside)
-  }
-
-  /** An empty, private [runtimeDirectory]. */
-  private fun resetDirectory() {
-    deleteTree(runtimeDirectory)
-    Files.createDirectories(runtimeDirectory.parent)
-    restrict(runtimeDirectory.parent, PRIVATE_DIRECTORY)
-    Files.createDirectory(runtimeDirectory)
-    restrict(runtimeDirectory, PRIVATE_DIRECTORY)
-  }
-
-  companion object {
-    private val logger = LoggerFactory.getLogger(OmemoVault::class.java)
-    private val RANDOM = SecureRandom()
-    private val MAGIC = "BUBVLT1".toByteArray()
-    private const val KEY_KIND = "omemo-vault-key"
-    private const val KEY_BYTES = 32
-    private const val NONCE_BYTES = 12
-    private const val TAG_BITS = 128
-    private const val PRIVATE_DIRECTORY = "rwx------"
-
-    private fun omemoConfig() = configFile("omemo")
-
-    /** `$XDG_RUNTIME_DIR/bubbles/omemo`; throws [IOException] where there is no such tmpfs, so keys never hit disk. */
-    private fun runtimeBase(): Path {
-      val runtime = System.getenv("XDG_RUNTIME_DIR")?.takeIf { it.isNotBlank() }
-        ?: throw IOException("XDG_RUNTIME_DIR is not set, so there is nowhere safe to keep the OMEMO keys")
-      return Path.of(runtime, "bubbles", "omemo")
-    }
-
-    private fun cipher(mode: Int, key: ByteArray, nonce: ByteArray): Cipher =
-      Cipher.getInstance("AES/GCM/NoPadding").apply {
-        init(mode, SecretKeySpec(key, "AES"), GCMParameterSpec(TAG_BITS, nonce))
-        updateAAD(MAGIC)
-      }
-
-    /** Best-effort `chmod`; file systems without POSIX permissions are skipped. */
-    private fun restrict(path: Path, permissions: String) {
-      try {
-        Files.setPosixFilePermissions(path, PosixFilePermissions.fromString(permissions))
-      } catch (e: UnsupportedOperationException) {
-        logger.warn("Cannot restrict the permissions of {}: {}", path, e.message)
-      }
-    }
-
-    private fun zip(directory: Path): ByteArray {
-      val bytes = ByteArrayOutputStream()
-      ZipOutputStream(bytes).use { zip ->
-        Files.walk(directory).use { paths ->
-          for (file in paths.filter(Files::isRegularFile)) {
-            zip.putNextEntry(ZipEntry(directory.relativize(file).joinToString("/")))
-            Files.copy(file, zip)
-            zip.closeEntry()
-          }
+            Files.isDirectory(legacyDirectory) -> {
+                logger.info("Moving the OMEMO keys of {} into the encrypted vault", account)
+                copyTree(legacyDirectory, runtimeDirectory)
+                flush()
+                deleteTree(legacyDirectory)
+            }
         }
-      }
-      return bytes.toByteArray()
+        return runtimeDirectory
     }
 
-    private fun unzip(data: ByteArray, target: Path) {
-      ZipInputStream(ByteArrayInputStream(data)).use { zip ->
-        generateSequence { zip.nextEntry }.forEach { entry ->
-          val file = target.resolve(entry.name).normalize()
-          if (!file.startsWith(target)) throw IOException("Bad path in the OMEMO vault: ${entry.name}")
-          Files.createDirectories(file.parent)
-          Files.copy(zip, file, StandardCopyOption.REPLACE_EXISTING)
+    /** Seals the current contents of [directory] into the vault. Blocking. Throws [IOException] if that fails. */
+    @Synchronized
+    fun flush() {
+        val sealing = key ?: return
+        val nonce = ByteArray(NONCE_BYTES).also(RANDOM::nextBytes)
+        val sealed = try {
+            cipher(Cipher.ENCRYPT_MODE, sealing, nonce).doFinal(zip(runtimeDirectory))
+        } catch (e: GeneralSecurityException) {
+            throw IOException("Could not encrypt the OMEMO keys: ${e.message}", e)
         }
-      }
+        Files.createDirectories(vaultFile.parent)
+        val temporary = vaultFile.resolveSibling("${vaultFile.fileName}.tmp")
+        Files.write(temporary, MAGIC + nonce + sealed)
+        restrict(temporary, "rw-------")
+        Files.move(temporary, vaultFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
     }
 
-    private fun copyTree(from: Path, to: Path) {
-      Files.walk(from).use { paths ->
-        for (source in paths) {
-          val destination = to.resolve(from.relativize(source).toString())
-          if (Files.isDirectory(source)) Files.createDirectories(destination) else Files.copy(source, destination)
+    /** Seals one last time, then removes the working files and forgets the key. */
+    @Synchronized
+    fun close() {
+        try {
+            flush()
+        } catch (e: IOException) {
+            logger.error("Could not save the OMEMO keys of {}: {}", account, e.message)
         }
-      }
+        deleteTree(runtimeDirectory)
+        key = null
     }
 
-    private fun deleteTree(directory: Path) {
-      if (!Files.exists(directory)) return
-      Files.walk(directory).use { paths -> paths.sorted(Comparator.reverseOrder()).forEach(Files::delete) }
+    /** The vault key from the keyring; a new random one, saved there, if there is none yet. */
+    private fun loadKey(): ByteArray = Keyring.open().use { keyring ->
+        keyring.get(account, KEY_KIND)?.takeIf { it.size == KEY_BYTES } ?: ByteArray(KEY_BYTES).also { fresh ->
+            RANDOM.nextBytes(fresh)
+            keyring.put(account, KEY_KIND, "Bubbles OMEMO vault key ($account)", fresh)
+        }
     }
-  }
+
+    /** Unseals the vault into [runtimeDirectory]; a vault that can't be decrypted is set aside and replaced. */
+    private fun unseal(sealing: ByteArray) {
+        val data = Files.readAllBytes(vaultFile)
+        val plain = try {
+            require(data.size > MAGIC.size + NONCE_BYTES && data.copyOf(MAGIC.size).contentEquals(MAGIC)) {
+                "bad header"
+            }
+            val nonce = data.copyOfRange(MAGIC.size, MAGIC.size + NONCE_BYTES)
+            val offset = MAGIC.size + NONCE_BYTES
+            cipher(Cipher.DECRYPT_MODE, sealing, nonce).doFinal(data, offset, data.size - offset)
+        } catch (e: GeneralSecurityException) {
+            return setAside(e)
+        } catch (e: IllegalArgumentException) {
+            return setAside(e)
+        }
+        unzip(plain, runtimeDirectory)
+    }
+
+    /** Keeps an unreadable vault under another name and starts without keys, which creates a new OMEMO device. */
+    private fun setAside(cause: Exception) {
+        val aside = vaultFile.resolveSibling("${vaultFile.fileName}.unreadable-${System.currentTimeMillis()}")
+        logger.error(
+            "Cannot decrypt the vault of {} ({}); keeping it as {}, starting fresh",
+            account,
+            cause.message,
+            aside,
+        )
+        Files.move(vaultFile, aside)
+    }
+
+    /** An empty, private [runtimeDirectory]. */
+    private fun resetDirectory() {
+        deleteTree(runtimeDirectory)
+        Files.createDirectories(runtimeDirectory.parent)
+        restrict(runtimeDirectory.parent, PRIVATE_DIRECTORY)
+        Files.createDirectory(runtimeDirectory)
+        restrict(runtimeDirectory, PRIVATE_DIRECTORY)
+    }
+
+    companion object {
+        private val logger = LoggerFactory.getLogger(OmemoVault::class.java)
+        private val RANDOM = SecureRandom()
+        private val MAGIC = "BUBVLT1".toByteArray()
+        private const val KEY_KIND = "omemo-vault-key"
+        private const val KEY_BYTES = 32
+        private const val NONCE_BYTES = 12
+        private const val TAG_BITS = 128
+        private const val PRIVATE_DIRECTORY = "rwx------"
+
+        private fun omemoConfig() = configFile("omemo")
+
+        /**
+         * `$XDG_RUNTIME_DIR/bubbles/omemo`; throws [IOException] where there is no such tmpfs, so keys never hit
+         * disk.
+         */
+        private fun runtimeBase(): Path {
+            val runtime = System.getenv("XDG_RUNTIME_DIR")?.takeIf { it.isNotBlank() }
+                ?: throw IOException("XDG_RUNTIME_DIR is not set, so there is nowhere safe to keep the OMEMO keys")
+            return Path.of(runtime, "bubbles", "omemo")
+        }
+
+        private fun cipher(mode: Int, key: ByteArray, nonce: ByteArray): Cipher =
+            Cipher.getInstance("AES/GCM/NoPadding").apply {
+                init(mode, SecretKeySpec(key, "AES"), GCMParameterSpec(TAG_BITS, nonce))
+                updateAAD(MAGIC)
+            }
+
+        /** Best-effort `chmod`; file systems without POSIX permissions are skipped. */
+        private fun restrict(path: Path, permissions: String) {
+            try {
+                Files.setPosixFilePermissions(path, PosixFilePermissions.fromString(permissions))
+            } catch (e: UnsupportedOperationException) {
+                logger.warn("Cannot restrict the permissions of {}: {}", path, e.message)
+            }
+        }
+
+        private fun zip(directory: Path): ByteArray {
+            val bytes = ByteArrayOutputStream()
+            ZipOutputStream(bytes).use { zip ->
+                Files.walk(directory).use { paths ->
+                    for (file in paths.filter(Files::isRegularFile)) {
+                        zip.putNextEntry(ZipEntry(directory.relativize(file).joinToString("/")))
+                        Files.copy(file, zip)
+                        zip.closeEntry()
+                    }
+                }
+            }
+            return bytes.toByteArray()
+        }
+
+        private fun unzip(data: ByteArray, target: Path) {
+            ZipInputStream(ByteArrayInputStream(data)).use { zip ->
+                generateSequence { zip.nextEntry }.forEach { entry ->
+                    val file = target.resolve(entry.name).normalize()
+                    if (!file.startsWith(target)) throw IOException("Bad path in the OMEMO vault: ${entry.name}")
+                    Files.createDirectories(file.parent)
+                    Files.copy(zip, file, StandardCopyOption.REPLACE_EXISTING)
+                }
+            }
+        }
+
+        private fun copyTree(from: Path, to: Path) {
+            Files.walk(from).use { paths ->
+                for (source in paths) {
+                    val destination = to.resolve(from.relativize(source).toString())
+                    if (Files.isDirectory(source)) {
+                        Files.createDirectories(destination)
+                    } else {
+                        Files.copy(source, destination)
+                    }
+                }
+            }
+        }
+
+        private fun deleteTree(directory: Path) {
+            if (!Files.exists(directory)) return
+            Files.walk(directory).use { paths -> paths.sorted(Comparator.reverseOrder()).forEach(Files::delete) }
+        }
+    }
 }

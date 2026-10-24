@@ -23,85 +23,89 @@ import java.nio.file.Path
  * @param requireApproval whether unknown devices need approval instead of being trusted on first use; read each time.
  */
 internal class DeviceTrust(private val file: Path, private val requireApproval: () -> Boolean) : OmemoTrustCallback {
-  /** Device (`jid:id`) to its pinned fingerprint and state. */
-  private val entries: MutableMap<String, Pinned> = load()
+    /** Device (`jid:id`) to its pinned fingerprint and state. */
+    private val entries: MutableMap<String, Pinned> = load()
 
-  @Synchronized
-  override fun getTrust(device: OmemoDevice, fingerprint: OmemoFingerprint): TrustState {
-    val key = key(device)
-    val pinned = entries[key]
-    return when {
-      pinned == null && requireApproval() -> {
-        logger.info("OMEMO device {} with fingerprint {} awaits approval", device, fingerprint)
-        TrustState.undecided
-      }
+    @Synchronized
+    override fun getTrust(device: OmemoDevice, fingerprint: OmemoFingerprint): TrustState {
+        val key = key(device)
+        val pinned = entries[key]
+        return when {
+            pinned == null && requireApproval() -> {
+                logger.info("OMEMO device {} with fingerprint {} awaits approval", device, fingerprint)
+                TrustState.undecided
+            }
 
-      pinned == null -> {
-        logger.info("Trusting new OMEMO device {} on first use, fingerprint {}", device, fingerprint)
-        setTrust(device, fingerprint, TrustState.trusted)
-        TrustState.trusted
-      }
+            pinned == null -> {
+                logger.info("Trusting new OMEMO device {} on first use, fingerprint {}", device, fingerprint)
+                setTrust(device, fingerprint, TrustState.trusted)
+                TrustState.trusted
+            }
 
-      pinned.fingerprint != fingerprint.toString() -> {
-        logger.warn("OMEMO device {} changed its fingerprint to {}", device, fingerprint)
-        TrustState.undecided
-      }
+            pinned.fingerprint != fingerprint.toString() -> {
+                logger.warn("OMEMO device {} changed its fingerprint to {}", device, fingerprint)
+                TrustState.undecided
+            }
 
-      else -> {
-        TrustState.valueOf(pinned.state)
-      }
+            else -> {
+                TrustState.valueOf(pinned.state)
+            }
+        }
     }
-  }
 
-  /** The state of [device] with [fingerprint] as last decided, without deciding anything; undecided if unknown. */
-  @Synchronized
-  fun peek(device: OmemoDevice, fingerprint: OmemoFingerprint): TrustState {
-    val pinned = entries[key(device)]
-    return if (pinned?.fingerprint == fingerprint.toString()) TrustState.valueOf(pinned.state) else TrustState.undecided
-  }
-
-  @Synchronized
-  override fun setTrust(device: OmemoDevice, fingerprint: OmemoFingerprint, state: TrustState) {
-    entries[key(device)] = Pinned(fingerprint.toString(), state.name)
-    save()
-  }
-
-  private fun key(device: OmemoDevice) = "${device.jid}:${device.deviceId}"
-
-  /** The saved decisions, or none if there are no usable ones. */
-  private fun load(): MutableMap<String, Pinned> = try {
-    if (Files.exists(file)) {
-      MAPPER.readValue(file.toFile(), Saved::class.java).entries.toMutableMap()
-    } else {
-      mutableMapOf()
+    /** The state of [device] with [fingerprint] as last decided, without deciding anything; undecided if unknown. */
+    @Synchronized
+    fun peek(device: OmemoDevice, fingerprint: OmemoFingerprint): TrustState {
+        val pinned = entries[key(device)]
+        return if (pinned?.fingerprint == fingerprint.toString()) {
+            TrustState.valueOf(pinned.state)
+        } else {
+            TrustState.undecided
+        }
     }
-  } catch (e: JacksonException) {
-    logger.warn("Could not read {}: {}", file, e.message)
-    mutableMapOf()
-  }
 
-  private fun save() {
-    try {
-      Files.createDirectories(file.parent)
-      MAPPER.writerWithDefaultPrettyPrinter().writeValue(file.toFile(), Saved(entries))
-    } catch (e: IOException) {
-      logger.warn("Could not write {}: {}", file, e.message)
+    @Synchronized
+    override fun setTrust(device: OmemoDevice, fingerprint: OmemoFingerprint, state: TrustState) {
+        entries[key(device)] = Pinned(fingerprint.toString(), state.name)
+        save()
+    }
+
+    private fun key(device: OmemoDevice) = "${device.jid}:${device.deviceId}"
+
+    /** The saved decisions, or none if there are no usable ones. */
+    private fun load(): MutableMap<String, Pinned> = try {
+        if (Files.exists(file)) {
+            MAPPER.readValue(file.toFile(), Saved::class.java).entries.toMutableMap()
+        } else {
+            mutableMapOf()
+        }
     } catch (e: JacksonException) {
-      logger.warn("Could not serialize the trust decisions to {}: {}", file, e.message)
+        logger.warn("Could not read {}: {}", file, e.message)
+        mutableMapOf()
     }
-  }
 
-  /** On-disk format of [file]. */
-  private data class Saved(@param:JsonProperty("entries") val entries: Map<String, Pinned>)
+    private fun save() {
+        try {
+            Files.createDirectories(file.parent)
+            MAPPER.writerWithDefaultPrettyPrinter().writeValue(file.toFile(), Saved(entries))
+        } catch (e: IOException) {
+            logger.warn("Could not write {}: {}", file, e.message)
+        } catch (e: JacksonException) {
+            logger.warn("Could not serialize the trust decisions to {}: {}", file, e.message)
+        }
+    }
 
-  /** A device's pinned fingerprint and its [TrustState] by name. */
-  private data class Pinned(
-    @param:JsonProperty("fingerprint") val fingerprint: String,
-    @param:JsonProperty("state") val state: String,
-  )
+    /** On-disk format of [file]. */
+    private data class Saved(@param:JsonProperty("entries") val entries: Map<String, Pinned>)
 
-  companion object {
-    private val logger = LoggerFactory.getLogger(DeviceTrust::class.java)
-    private val MAPPER = JsonMapper.builder().build()
-  }
+    /** A device's pinned fingerprint and its [TrustState] by name. */
+    private data class Pinned(
+        @param:JsonProperty("fingerprint") val fingerprint: String,
+        @param:JsonProperty("state") val state: String,
+    )
+
+    companion object {
+        private val logger = LoggerFactory.getLogger(DeviceTrust::class.java)
+        private val MAPPER = JsonMapper.builder().build()
+    }
 }

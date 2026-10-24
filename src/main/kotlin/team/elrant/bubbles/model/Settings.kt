@@ -22,26 +22,26 @@ package team.elrant.bubbles.model
  * @property groupOrder order of roster groups in the contact list; groups not listed follow, by name.
  */
 data class Settings(
-  val flavor: Flavor = Flavor.Mocha,
-  val accent: Accent = Accent.Mauve,
-  val enterSends: Boolean = true,
-  val runGapMinutes: Int = DEFAULT_RUN_GAP_MINUTES,
-  val use24HourClock: Boolean = true,
-  val openOnMessage: Boolean = true,
-  val raiseOnMessage: Boolean = false,
-  val requestAttention: Boolean = true,
-  val encryptMessages: Boolean = true,
-  val sendReadReceipts: Boolean = true,
-  val requireDeviceApproval: Boolean = false,
-  val groupOrder: List<String> = emptyList(),
+    val flavor: Flavor = Flavor.Mocha,
+    val accent: Accent = Accent.Mauve,
+    val enterSends: Boolean = true,
+    val runGapMinutes: Int = DEFAULT_RUN_GAP_MINUTES,
+    val use24HourClock: Boolean = true,
+    val openOnMessage: Boolean = true,
+    val raiseOnMessage: Boolean = false,
+    val requestAttention: Boolean = true,
+    val encryptMessages: Boolean = true,
+    val sendReadReceipts: Boolean = true,
+    val requireDeviceApproval: Boolean = false,
+    val groupOrder: List<String> = emptyList(),
 ) {
-  companion object {
-    /** Default for [runGapMinutes]. */
-    const val DEFAULT_RUN_GAP_MINUTES = 5
+    companion object {
+        /** Default for [runGapMinutes]. */
+        const val DEFAULT_RUN_GAP_MINUTES = 5
 
-    /** Allowed values of [runGapMinutes]. */
-    val RUN_GAP_RANGE = 1..60
-  }
+        /** Allowed values of [runGapMinutes]. */
+        val RUN_GAP_RANGE = 1..60
+    }
 }
 
 /**
@@ -51,10 +51,10 @@ data class Settings(
  * @property dark whether it is a dark theme.
  */
 enum class Flavor(val label: String, val dark: Boolean) {
-  Latte("Latte", dark = false),
-  Frappe("Frappé", dark = true),
-  Macchiato("Macchiato", dark = true),
-  Mocha("Mocha", dark = true),
+    Latte("Latte", dark = false),
+    Frappe("Frappé", dark = true),
+    Macchiato("Macchiato", dark = true),
+    Mocha("Mocha", dark = true),
 }
 
 /**
@@ -63,18 +63,18 @@ enum class Flavor(val label: String, val dark: Boolean) {
  * @property label user-facing name.
  */
 enum class Accent(val label: String) {
-  Rosewater("Rosewater"),
-  Flamingo("Flamingo"),
-  Pink("Pink"),
-  Mauve("Mauve"),
-  Red("Red"),
-  Maroon("Maroon"),
-  Peach("Peach"),
-  Yellow("Yellow"),
-  Green("Green"),
-  Teal("Teal"),
-  Sky("Sky"),
-  Sapphire("Sapphire"),
-  Blue("Blue"),
-  Lavender("Lavender"),
+    Rosewater("Rosewater"),
+    Flamingo("Flamingo"),
+    Pink("Pink"),
+    Mauve("Mauve"),
+    Red("Red"),
+    Maroon("Maroon"),
+    Peach("Peach"),
+    Yellow("Yellow"),
+    Green("Green"),
+    Teal("Teal"),
+    Sky("Sky"),
+    Sapphire("Sapphire"),
+    Blue("Blue"),
+    Lavender("Lavender"),
 }

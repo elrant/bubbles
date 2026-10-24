@@ -41,51 +41,51 @@ private const val INITIALS_SIZE = 0.34f
  */
 @Composable
 fun displayPicture(
-  name: String,
-  status: Status,
-  size: Dp,
-  modifier: Modifier = Modifier,
-  picture: ImageBitmap? = null,
+    name: String,
+    status: Status,
+    size: Dp,
+    modifier: Modifier = Modifier,
+    picture: ImageBitmap? = null,
 ) {
-  Box(
-    modifier
-      .size(size)
-      .clip(RoundedCornerShape(size * FRAME_CORNER))
-      .background(status.color)
-      .padding(size * FRAME_WIDTH),
-    contentAlignment = Alignment.Center,
-  ) {
     Box(
-      Modifier
-        .fillMaxSize()
-        .clip(RoundedCornerShape(size * PICTURE_CORNER))
-        .background(MaterialTheme.colorScheme.surfaceVariant),
-      contentAlignment = Alignment.Center,
+        modifier
+            .size(size)
+            .clip(RoundedCornerShape(size * FRAME_CORNER))
+            .background(status.color)
+            .padding(size * FRAME_WIDTH),
+        contentAlignment = Alignment.Center,
     ) {
-      if (picture != null) {
-        Image(picture, name, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-      } else {
-        Text(
-          initials(name),
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-          fontSize = (size.value * INITIALS_SIZE).sp,
-          fontWeight = FontWeight.SemiBold,
-        )
-      }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(size * PICTURE_CORNER))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (picture != null) {
+                Image(picture, name, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            } else {
+                Text(
+                    initials(name),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = (size.value * INITIALS_SIZE).sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
     }
-  }
 }
 
 /** Small circle in the presence colour of [status]. */
 @Composable
 fun statusDot(status: Status, modifier: Modifier = Modifier, size: Dp = 10.dp) {
-  Box(modifier.size(size).clip(CircleShape).background(status.color))
+    Box(modifier.size(size).clip(CircleShape).background(status.color))
 }
 
 /** Up to two uppercase initials from the words of [name] (ignoring any `@domain`), or `?`. */
 private fun initials(name: String): String = name.substringBefore('@')
-  .split(' ', '.', '_', '-')
-  .filter { it.isNotBlank() }
-  .take(2)
-  .joinToString("") { it.first().uppercase() }
-  .ifEmpty { "?" }
+    .split(' ', '.', '_', '-')
+    .filter { it.isNotBlank() }
+    .take(2)
+    .joinToString("") { it.first().uppercase() }
+    .ifEmpty { "?" }

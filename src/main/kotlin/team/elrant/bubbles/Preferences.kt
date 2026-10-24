@@ -22,35 +22,35 @@ import team.elrant.bubbles.store.SettingsStore
  * @param scope main-thread scope that runs the background saves.
  */
 class Preferences(
-  private val accounts: AccountStore,
-  private val settingsStore: SettingsStore,
-  private val scope: CoroutineScope,
+    private val accounts: AccountStore,
+    private val settingsStore: SettingsStore,
+    private val scope: CoroutineScope,
 ) {
-  /** Address remembered from the last "Remember me" sign-in, or `null` if none. */
-  var savedAddress by mutableStateOf(accounts.load())
-    private set
+    /** Address remembered from the last "Remember me" sign-in, or `null` if none. */
+    var savedAddress by mutableStateOf(accounts.load())
+        private set
 
-  /** The user's preferences; change them with [update]. */
-  var settings by mutableStateOf(settingsStore.load())
-    private set
+    /** The user's preferences; change them with [update]. */
+    var settings by mutableStateOf(settingsStore.load())
+        private set
 
-  /** Replaces [settings] with `transform(settings)` and saves them in the background. */
-  fun update(transform: (Settings) -> Settings) {
-    val updated = transform(settings)
-    if (updated == settings) return
-    settings = updated
-    scope.launch(Dispatchers.IO) { settingsStore.save(updated) }
-  }
+    /** Replaces [settings] with `transform(settings)` and saves them in the background. */
+    fun update(transform: (Settings) -> Settings) {
+        val updated = transform(settings)
+        if (updated == settings) return
+        settings = updated
+        scope.launch(Dispatchers.IO) { settingsStore.save(updated) }
+    }
 
-  /** Forgets [savedAddress]. */
-  fun forgetAddress() {
-    savedAddress = null
-    scope.launch(Dispatchers.IO) { accounts.clear() }
-  }
+    /** Forgets [savedAddress]. */
+    fun forgetAddress() {
+        savedAddress = null
+        scope.launch(Dispatchers.IO) { accounts.clear() }
+    }
 
-  /** Remembers [address] as [savedAddress], or forgets the saved one if it is `null`. Waits for the file. */
-  internal suspend fun rememberAddress(address: String?) {
-    withContext(Dispatchers.IO) { if (address != null) accounts.save(address) else accounts.clear() }
-    savedAddress = address
-  }
+    /** Remembers [address] as [savedAddress], or forgets the saved one if it is `null`. Waits for the file. */
+    internal suspend fun rememberAddress(address: String?) {
+        withContext(Dispatchers.IO) { if (address != null) accounts.save(address) else accounts.clear() }
+        savedAddress = address
+    }
 }

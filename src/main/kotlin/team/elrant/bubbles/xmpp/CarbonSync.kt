@@ -22,71 +22,77 @@ import team.elrant.bubbles.model.ChatMessage
  *   receipt, i.e. the conversation was read there.
  */
 internal class CarbonSync(
-  private val onReceived: (from: BareJid, message: ChatMessage) -> Unit,
-  private val onSent: (to: BareJid, message: ChatMessage) -> Unit,
-  private val onContactRead: (contact: BareJid, id: String) -> Unit,
-  private val onReadElsewhere: (contact: BareJid, id: String) -> Unit,
+    private val onReceived: (from: BareJid, message: ChatMessage) -> Unit,
+    private val onSent: (to: BareJid, message: ChatMessage) -> Unit,
+    private val onContactRead: (contact: BareJid, id: String) -> Unit,
+    private val onReadElsewhere: (contact: BareJid, id: String) -> Unit,
 ) {
-  /**
-   * Asks the server to copy messages exchanged with our other devices to [connection] and routes plain-text copies to
-   * the callbacks; encrypted ones arrive through the OMEMO listener, which calls [deliver]. Not fatal if the server
-   * can't or won't: we then only see what reaches this device.
-   */
-  fun enable(connection: XMPPConnection) {
-    val carbons = CarbonManager.getInstanceFor(connection)
-    carbons.addCarbonCopyReceivedListener { direction, carbonCopy, _ ->
-      val body = carbonCopy.body
-      if (body != null && !carbonCopy.isOmemo()) {
-        deliver(direction, carbonCopy, body, encrypted = false)
-      } else {
-        deliverMarker(direction, carbonCopy)
-      }
+    /**
+     * Asks the server to copy messages exchanged with our other devices to [connection] and routes plain-text copies to
+     * the callbacks; encrypted ones arrive through the OMEMO listener, which calls [deliver]. Not fatal if the server
+     * can't or won't: we then only see what reaches this device.
+     */
+    fun enable(connection: XMPPConnection) {
+        val carbons = CarbonManager.getInstanceFor(connection)
+        carbons.addCarbonCopyReceivedListener { direction, carbonCopy, _ ->
+            val body = carbonCopy.body
+            if (body != null && !carbonCopy.isOmemo()) {
+                deliver(direction, carbonCopy, body, encrypted = false)
+            } else {
+                deliverMarker(direction, carbonCopy)
+            }
+        }
+        try {
+            if (carbons.isSupportedByServer) {
+                carbons.enableCarbons()
+                logger.info("Message carbons enabled")
+            } else {
+                logger.info("The server doesn't support message carbons; other devices' messages won't be mirrored")
+            }
+        } catch (e: SmackException) {
+            logger.warn("Could not enable message carbons: {}", e.message)
+        } catch (e: XMPPException) {
+            logger.warn("Server refused message carbons: {}", e.message)
+        }
     }
-    try {
-      if (carbons.isSupportedByServer) {
-        carbons.enableCarbons()
-        logger.info("Message carbons enabled")
-      } else {
-        logger.info("The server doesn't support message carbons; other devices' messages won't be mirrored")
-      }
-    } catch (e: SmackException) {
-      logger.warn("Could not enable message carbons: {}", e.message)
-    } catch (e: XMPPException) {
-      logger.warn("Server refused message carbons: {}", e.message)
+
+    /** Hands a copy of a read receipt (a "displayed" chat marker) to the callbacks; other copies are ignored. */
+    private fun deliverMarker(direction: CarbonExtension.Direction, copy: Message) {
+        val id = ChatMarkersElements.DisplayedExtension.from(copy)?.id ?: return
+        when (direction) {
+            CarbonExtension.Direction.received -> copy.from?.asBareJid()?.let { onContactRead(it, id) }
+            CarbonExtension.Direction.sent -> copy.to?.asBareJid()?.let { onReadElsewhere(it, id) }
+        }
     }
-  }
 
-  /** Hands a copy of a read receipt (a "displayed" chat marker) to the callbacks; other copies are ignored. */
-  private fun deliverMarker(direction: CarbonExtension.Direction, copy: Message) {
-    val id = ChatMarkersElements.DisplayedExtension.from(copy)?.id ?: return
-    when (direction) {
-      CarbonExtension.Direction.received -> copy.from?.asBareJid()?.let { onContactRead(it, id) }
-      CarbonExtension.Direction.sent -> copy.to?.asBareJid()?.let { onReadElsewhere(it, id) }
+    /**
+     * Hands a carbon copy with [body] to the callbacks: a message another device of ours received comes in like any
+     * other, one it sent joins the conversation with the recipient.
+     */
+    fun deliver(direction: CarbonExtension.Direction, copy: Message, body: String, encrypted: Boolean) {
+        when (direction) {
+            CarbonExtension.Direction.received -> copy.from?.asBareJid()?.let { from ->
+                logger.info("Received message for another device from {}", from)
+                onReceived(
+                    from,
+                    ChatMessage(
+                        body,
+                        outgoing = false,
+                        encrypted = encrypted,
+                        id = copy.stanzaId,
+                        markable = copy.isMarkable(),
+                    ),
+                )
+            }
+
+            CarbonExtension.Direction.sent -> copy.to?.asBareJid()?.let { to ->
+                logger.info("Message sent to {} from another device", to)
+                onSent(to, ChatMessage(body, outgoing = true, encrypted = encrypted, id = copy.stanzaId))
+            }
+        }
     }
-  }
 
-  /**
-   * Hands a carbon copy with [body] to the callbacks: a message another device of ours received comes in like any
-   * other, one it sent joins the conversation with the recipient.
-   */
-  fun deliver(direction: CarbonExtension.Direction, copy: Message, body: String, encrypted: Boolean) {
-    when (direction) {
-      CarbonExtension.Direction.received -> copy.from?.asBareJid()?.let { from ->
-        logger.info("Received message for another device from {}", from)
-        onReceived(
-          from,
-          ChatMessage(body, outgoing = false, encrypted = encrypted, id = copy.stanzaId, markable = copy.isMarkable()),
-        )
-      }
-
-      CarbonExtension.Direction.sent -> copy.to?.asBareJid()?.let { to ->
-        logger.info("Message sent to {} from another device", to)
-        onSent(to, ChatMessage(body, outgoing = true, encrypted = encrypted, id = copy.stanzaId))
-      }
+    private companion object {
+        val logger = LoggerFactory.getLogger(CarbonSync::class.java)
     }
-  }
-
-  private companion object {
-    val logger = LoggerFactory.getLogger(CarbonSync::class.java)
-  }
 }

@@ -19,29 +19,29 @@ import java.time.ZoneOffset
  * @param current the signed-in account; answers that arrive after it changed are dropped.
  */
 class ContactClocks(private val scope: CoroutineScope, private val current: () -> ConnectedUser?) {
-  private val offsets = mutableStateMapOf<BareJid, ZoneOffset>()
+    private val offsets = mutableStateMapOf<BareJid, ZoneOffset>()
 
-  /** The UTC offset of [jid]'s clock, if they have told us; `null` otherwise. */
-  fun offset(jid: BareJid): ZoneOffset? = offsets[jid]
+    /** The UTC offset of [jid]'s clock, if they have told us; `null` otherwise. */
+    fun offset(jid: BareJid): ZoneOffset? = offsets[jid]
 
-  /** Asks [jid]'s most available device for its clock's UTC offset in the background. Failures are only logged. */
-  fun request(connected: ConnectedUser, jid: BareJid) {
-    scope.launch {
-      try {
-        val offset = runInterruptible(Dispatchers.IO) { connected.localOffset(jid) }
-        if (current() === connected && offset != null) offsets[jid] = offset
-      } catch (e: SmackException) {
-        logger.debug("{} doesn't tell their local time: {}", jid, e.message)
-      } catch (e: XMPPException) {
-        logger.debug("{} refused to tell their local time: {}", jid, e.message)
-      }
+    /** Asks [jid]'s most available device for its clock's UTC offset in the background. Failures are only logged. */
+    fun request(connected: ConnectedUser, jid: BareJid) {
+        scope.launch {
+            try {
+                val offset = runInterruptible(Dispatchers.IO) { connected.localOffset(jid) }
+                if (current() === connected && offset != null) offsets[jid] = offset
+            } catch (e: SmackException) {
+                logger.debug("{} doesn't tell their local time: {}", jid, e.message)
+            } catch (e: XMPPException) {
+                logger.debug("{} refused to tell their local time: {}", jid, e.message)
+            }
+        }
     }
-  }
 
-  /** Forgets every offset, e.g. on sign-out. */
-  fun clear() = offsets.clear()
+    /** Forgets every offset, e.g. on sign-out. */
+    fun clear() = offsets.clear()
 
-  private companion object {
-    val logger = LoggerFactory.getLogger(ContactClocks::class.java)
-  }
+    private companion object {
+        val logger = LoggerFactory.getLogger(ContactClocks::class.java)
+    }
 }

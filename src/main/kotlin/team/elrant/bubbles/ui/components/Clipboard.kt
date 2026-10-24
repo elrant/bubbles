@@ -11,9 +11,9 @@ private val logger = LoggerFactory.getLogger("team.elrant.bubbles.ui.components.
  * experimental. If the clipboard is unavailable, the failure is logged.
  */
 fun copyToClipboard(text: String) {
-  try {
-    Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(text), null)
-  } catch (e: IllegalStateException) {
-    logger.warn("Could not copy to the clipboard: {}", e.message)
-  }
+    try {
+        Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(text), null)
+    } catch (e: IllegalStateException) {
+        logger.warn("Could not copy to the clipboard: {}", e.message)
+    }
 }
