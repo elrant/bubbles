@@ -53,6 +53,7 @@ class SettingsStore(private val file: Path = configFile("settings.json")) {
     @param:JsonProperty("raiseOnMessage") val raiseOnMessage: Boolean?,
     @param:JsonProperty("requestAttention") val requestAttention: Boolean?,
     @param:JsonProperty("encryptMessages") val encryptMessages: Boolean?,
+    @param:JsonProperty("sendReadReceipts") val sendReadReceipts: Boolean?,
     @param:JsonProperty("requireDeviceApproval") val requireDeviceApproval: Boolean?,
     @param:JsonProperty("groupOrder") val groupOrder: List<String>?,
   ) {
@@ -69,6 +70,7 @@ class SettingsStore(private val file: Path = configFile("settings.json")) {
         raiseOnMessage = raiseOnMessage ?: defaults.raiseOnMessage,
         requestAttention = requestAttention ?: defaults.requestAttention,
         encryptMessages = encryptMessages ?: defaults.encryptMessages,
+        sendReadReceipts = sendReadReceipts ?: defaults.sendReadReceipts,
         requireDeviceApproval = requireDeviceApproval ?: defaults.requireDeviceApproval,
         groupOrder = groupOrder ?: defaults.groupOrder,
       )
@@ -86,6 +88,7 @@ class SettingsStore(private val file: Path = configFile("settings.json")) {
         raiseOnMessage = settings.raiseOnMessage,
         requestAttention = settings.requestAttention,
         encryptMessages = settings.encryptMessages,
+        sendReadReceipts = settings.sendReadReceipts,
         requireDeviceApproval = settings.requireDeviceApproval,
         groupOrder = settings.groupOrder,
       )

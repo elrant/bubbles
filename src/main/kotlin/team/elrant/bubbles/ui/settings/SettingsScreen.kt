@@ -171,6 +171,9 @@ private fun privacySection(
     toggle("Encrypt messages with OMEMO when the contact supports it", settings.encryptMessages) { on ->
       update { it.copy(encryptMessages = on) }
     }
+    toggle("Tell contacts when I've read their messages", settings.sendReadReceipts) { on ->
+      update { it.copy(sendReadReceipts = on) }
+    }
     toggle("Ask before trusting a contact's new OMEMO device", settings.requireDeviceApproval) { on ->
       update { it.copy(requireDeviceApproval = on) }
     }

@@ -16,9 +16,9 @@ import org.jivesoftware.smack.tcp.XMPPTCPConnection
 import org.jivesoftware.smack.tcp.XMPPTCPConnectionConfiguration
 import org.jivesoftware.smack.util.stringencoder.Base64
 import org.jivesoftware.smackx.carbons.packet.CarbonExtension
+import org.jivesoftware.smackx.chat_markers.element.ChatMarkersElements
 import org.jivesoftware.smackx.omemo.OmemoManager
 import org.jivesoftware.smackx.omemo.OmemoMessage
-import org.jivesoftware.smackx.omemo.element.OmemoElement
 import org.jivesoftware.smackx.omemo.exceptions.CorruptedOmemoKeyException
 import org.jivesoftware.smackx.omemo.exceptions.CryptoFailedException
 import org.jivesoftware.smackx.omemo.exceptions.UndecidedOmemoIdentityException
@@ -28,22 +28,26 @@ import org.jivesoftware.smackx.omemo.signal.SignalFileBasedOmemoStore
 import org.jivesoftware.smackx.omemo.signal.SignalOmemoService
 import org.jivesoftware.smackx.omemo.trust.OmemoFingerprint
 import org.jivesoftware.smackx.omemo.trust.TrustState
-import org.jivesoftware.smackx.omemo.util.OmemoConstants
 import org.jivesoftware.smackx.pubsub.PubSubException
+import org.jivesoftware.smackx.time.EntityTimeManager
 import org.jivesoftware.smackx.vcardtemp.VCardManager
 import org.jxmpp.jid.BareJid
 import org.jxmpp.jid.Jid
 import org.jxmpp.jid.impl.JidCreate
 import org.slf4j.LoggerFactory
+import team.elrant.bubbles.model.ChatMessage
 import team.elrant.bubbles.model.Contact
 import team.elrant.bubbles.model.OmemoIdentity
 import team.elrant.bubbles.model.Status
+import team.elrant.bubbles.store.AccountLock
 import team.elrant.bubbles.store.OmemoVault
 import java.io.IOException
 import java.net.InetAddress
 import java.security.Security
 import java.security.cert.CertificateParsingException
 import java.security.cert.X509Certificate
+import java.time.ZoneOffset
+import java.util.Date
 import javax.net.ssl.SSLPeerUnverifiedException
 import javax.net.ssl.SSLSession
 
@@ -57,7 +61,13 @@ import javax.net.ssl.SSLSession
  * @param password account password; used only for login.
  * @property serviceName XMPP domain; also resolved as the host to connect to.
  * @param onMessage invoked for every incoming chat message that has a body, with this connection as
- *   `source`; `encrypted` tells whether it arrived OMEMO-encrypted.
+ *   `source` and the message as it arrived (encryption, stanza id and whether it asks for read receipts). This
+ *   includes messages that other devices of ours received (message carbons).
+ * @param onRead invoked when `contact` reports having seen our message with stanza id `id` (chat markers).
+ * @param onReadElsewhere invoked when another device of ours has read the conversation with `contact` up to their
+ *   message with stanza id `id`.
+ * @param onSynced invoked with messages that belong to the conversation with `contact` but didn't come in live,
+ *   namely ones we sent from another device (message carbons).
  * @param onRosterChanged invoked with this connection when roster entries or contact presences change.
  * @param requireApproval whether OMEMO devices not seen before must be approved instead of trusted on first use;
  *   read whenever a device turns up.
@@ -66,8 +76,14 @@ class ConnectedUser(
   val username: String,
   private val password: String,
   val serviceName: String,
-  private val onMessage: (source: ConnectedUser, from: BareJid, body: String, encrypted: Boolean) -> Unit =
-    { _, _, _, _ ->
+  private val onMessage: (source: ConnectedUser, from: BareJid, message: ChatMessage) -> Unit = { _, _, _ ->
+  },
+  private val onRead: (source: ConnectedUser, contact: BareJid, id: String) -> Unit = { _, _, _ ->
+  },
+  private val onReadElsewhere: (source: ConnectedUser, contact: BareJid, id: String) -> Unit = { _, _, _ ->
+  },
+  private val onSynced: (source: ConnectedUser, contact: BareJid, messages: List<ChatMessage>) -> Unit =
+    { _, _, _ ->
     },
   private val onRosterChanged: (source: ConnectedUser) -> Unit = {},
   private val requireApproval: () -> Boolean = { false },
@@ -80,6 +96,32 @@ class ConnectedUser(
   private var trust: DeviceTrust? = null
   private var vault: OmemoVault? = null
 
+  /**
+   * When this connection was about to log in. History pulled from the archive stops here: everything later reached
+   * us live (or as a carbon copy), so fetching it again would only duplicate messages we sent ourselves, which
+   * carry no id to recognise them by.
+   */
+  private var connectedAt = Date()
+
+  /** Read receipts, both ways. */
+  val readReceipts = ReadReceipts(
+    own = { jid },
+    connection = { connection },
+    onRead = { contact, id -> onRead(this, contact, id) },
+  )
+
+  private val lock = AccountLock(address)
+
+  private val carbons = CarbonSync(
+    onReceived = { from, message -> onMessage(this, from, message) },
+    onSent = { to, message -> onSynced(this, to, listOf(message)) },
+    onContactRead = { contact, id -> onRead(this, contact, id) },
+    onReadElsewhere = { contact, id -> onReadElsewhere(this, contact, id) },
+  )
+
+  /** The server-side message archive from before this connection was made; `null` before [initializeConnection]. */
+  val archive: MessageArchive? get() = connection?.let { MessageArchive(it, jid, connectedAt) }
+
   /** The account's bare JID, `username@serviceName`. */
   val address: String get() = "$username@$serviceName"
 
@@ -89,10 +131,13 @@ class ConnectedUser(
   /**
    * Connects, logs in, sets up the chat manager and populates the roster. Blocking.
    *
+   * First takes the account's [AccountLock], so only one Bubbles instance can be signed in as it at a time.
+   *
    * TLS is required, and the certificate is checked against [serviceName] by [verifyCertHostname].
    * Throws if the connection or login fails.
    */
   fun initializeConnection() {
+    lock.acquire()
     logger.info("logging in {}...", serviceName)
     val service = serviceName
     val conn = XMPPTCPConnection(
@@ -106,20 +151,24 @@ class ConnectedUser(
         .build(),
     )
     connection = conn
+    connectedAt = Date()
     conn.connect().login()
     logger.info("...welcome, {}!", username)
 
     chat = ChatManager.getInstanceFor(conn).also { manager ->
       manager.addIncomingListener { from, message, _ ->
         // An encrypted message may carry a plain-text hint body, which must not be shown as the message.
-        if (message.hasExtension(OmemoElement.NAME_ENCRYPTED, OmemoConstants.OMEMO_NAMESPACE_V_AXOLOTL)) {
+        if (message.isOmemo()) {
           return@addIncomingListener
         }
         val body = message.body ?: return@addIncomingListener
         logger.info("Received message from {}: {}", from, body)
-        onMessage(this@ConnectedUser, from, body, false)
+        val received = ChatMessage(body, outgoing = false, id = message.stanzaId, markable = message.isMarkable())
+        onMessage(this@ConnectedUser, from, received)
       }
     }
+    carbons.enable(conn)
+    readReceipts.listen(conn)
     roster = Roster.getInstanceFor(conn).apply {
       addRosterListener(object : RosterListener {
         override fun entriesAdded(addresses: Collection<Jid>) = onRosterChanged(this@ConnectedUser)
@@ -161,7 +210,11 @@ class ConnectedUser(
           val body = decrypted.body ?: return
           val from = (stanza as? Message)?.from?.asBareJid() ?: return
           logger.info("Received encrypted message from {}", from)
-          onMessage(this@ConnectedUser, from, body, true)
+          val markable = (stanza as? Message)?.isMarkable() == true
+          onMessage(
+            this@ConnectedUser, from,
+            ChatMessage(body, outgoing = false, encrypted = true, id = stanza.stanzaId, markable = markable),
+          )
           sealKeys()
         }
 
@@ -170,7 +223,11 @@ class ConnectedUser(
           carbonCopy: Message,
           wrappingMessage: Message,
           decryptedCarbonCopy: OmemoMessage.Received,
-        ) = Unit
+        ) {
+          val body = decryptedCarbonCopy.body ?: return
+          carbons.deliver(direction, carbonCopy, body, encrypted = true)
+          sealKeys()
+        }
       })
       manager.initialize()
       sealKeys()
@@ -252,14 +309,14 @@ class ConnectedUser(
    * Sends [message] to [contact] (user@service.name). Blocking. Failures are logged, not thrown.
    *
    * With [encrypt], the message is OMEMO-encrypted if OMEMO is running and [contact] supports it; otherwise it is
-   * sent as plain text, which the result reports.
+   * sent as plain text, which the result reports along with the stanza id it went out under.
    */
-  fun sendMessage(contact: BareJid, message: String, encrypt: Boolean): SendResult {
+  fun sendMessage(contact: BareJid, message: String, encrypt: Boolean): SendReport {
     val entity = contact.asEntityBareJidIfPossible()
     val conn = connection
     if (entity == null || conn == null) {
       logger.error("Cannot chat with {}: not a user JID or not connected", contact)
-      return SendResult.Failed
+      return SendReport(SendResult.Failed)
     }
     return try {
       val manager = omemo?.takeIf { encrypt && it.contactSupportsOmemo(contact) }
@@ -268,12 +325,23 @@ class ConnectedUser(
         if (sent.isMissingRecipients) {
           logger.warn("Not encrypted for all devices of {}: {}", contact, sent.skippedDevices)
         }
-        conn.sendStanza(sent.buildMessage(conn.stanzaFactory.buildMessageStanza(), entity))
+        val stanza = sent.buildMessage(
+          conn.stanzaFactory.buildMessageStanza().addExtension(ChatMarkersElements.MarkableExtension.INSTANCE),
+          entity,
+        )
+        conn.sendStanza(stanza)
         sealKeys()
-        SendResult.Encrypted
+        SendReport(SendResult.Encrypted, stanza.stanzaId)
       } else {
-        chat?.chatWith(entity)?.send(message)
-        SendResult.Plain
+        // Built here rather than through the chat manager, to learn the stanza id.
+        val stanza = conn.stanzaFactory.buildMessageStanza()
+          .ofType(Message.Type.chat)
+          .to(entity)
+          .setBody(message)
+          .addExtension(ChatMarkersElements.MarkableExtension.INSTANCE)
+          .build()
+        conn.sendStanza(stanza)
+        SendReport(SendResult.Plain, stanza.stanzaId)
       }
     } catch (e: SmackException) {
       sendFailed(contact, "connection problem", e)
@@ -294,9 +362,20 @@ class ConnectedUser(
   }
 
   /** Logs that a message to [contact] wasn't sent, for [reason], and reports the failure. */
-  private fun sendFailed(contact: BareJid, reason: String, cause: Exception): SendResult {
+  private fun sendFailed(contact: BareJid, reason: String, cause: Exception): SendReport {
     logger.error("Could not send a message to {}: {}: {}", contact, reason, cause.message)
-    return SendResult.Failed
+    return SendReport(SendResult.Failed)
+  }
+
+  /**
+   * The UTC offset of [contact]'s clock (XEP-0202), asked of their most available device; `null` if they are offline
+   * or before [initializeConnection]. Blocking. Throws if the device doesn't answer or doesn't support it.
+   */
+  fun localOffset(contact: BareJid): ZoneOffset? {
+    val conn = connection
+    val presence = roster?.getPresence(contact)?.takeIf { it.isAvailable }
+    if (conn == null || presence == null) return null
+    return EntityTimeManager.getInstanceFor(conn).getTime(presence.from)?.zonedDateTime?.offset
   }
 
   /**
@@ -359,6 +438,7 @@ class ConnectedUser(
     connection?.disconnect()
     vault?.close()
     vault = null
+    lock.release()
   }
 
   /** Saves the OMEMO keys back into the encrypted vault; a failure is logged, since the keys stay in memory. */
@@ -448,3 +528,11 @@ enum class SendResult {
   /** Not sent. */
   Failed,
 }
+
+/**
+ * The outcome of [ConnectedUser.sendMessage].
+ *
+ * @property result what became of the message.
+ * @property id the stanza id it was sent under; `null` if it wasn't sent.
+ */
+data class SendReport(val result: SendResult, val id: String? = null)

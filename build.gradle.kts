@@ -24,6 +24,7 @@ dependencies {
   implementation(libs.bundles.logging)
   implementation(libs.bundles.xmpp)
   implementation(libs.bundles.secrets)
+  implementation(libs.bundles.qr)
   implementation(libs.bundles.coroutines)
 
   detektPlugins(libs.detekt.ktlint)

@@ -97,6 +97,7 @@ private fun conversationWindows(bubbles: Bubbles) {
         settings = bubbles.preferences.settings,
         onCloseRequest = { bubbles.closeConversation(jid) },
         attention = bubbles.incoming[jid] ?: 0,
+        onFocusChange = { bubbles.conversationFocused(jid, it) },
       ) {
         conversationScreen(bubbles, user, contact)
       }

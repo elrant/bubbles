@@ -74,6 +74,7 @@ fun createWindow(
  * @param onCloseRequest called when the user tries to close the window.
  * @param attention whenever this changes after the window is created, the window is raised and/or
  *   flagged to the desktop, as [Settings.raiseOnMessage] and [Settings.requestAttention] say.
+ * @param onFocusChange called with `true` when the window gains the focus and `false` when it loses it.
  * @param content the window's contents.
  */
 @Composable
@@ -84,9 +85,11 @@ fun bubblesWindow(
   settings: Settings,
   onCloseRequest: () -> Unit,
   attention: Int = 0,
+  onFocusChange: (Boolean) -> Unit = {},
   content: @Composable () -> Unit,
 ) {
   val currentContent by rememberUpdatedState(content)
+  val currentOnFocusChange by rememberUpdatedState(onFocusChange)
   val currentOnCloseRequest by rememberUpdatedState(onCloseRequest)
   val currentSettings by rememberUpdatedState(settings)
   val frame = remember {
@@ -96,8 +99,17 @@ fun bubblesWindow(
 
   SideEffect { frame.title = title }
   DisposableEffect(frame) {
+    val focusListener = object : WindowAdapter() {
+      override fun windowGainedFocus(e: WindowEvent) = currentOnFocusChange(true)
+
+      override fun windowLostFocus(e: WindowEvent) = currentOnFocusChange(false)
+    }
+    frame.addWindowFocusListener(focusListener)
     frame.isVisible = true
-    onDispose { frame.dispose() }
+    onDispose {
+      frame.removeWindowFocusListener(focusListener)
+      frame.dispose()
+    }
   }
   LaunchedEffect(attention) {
     if (attention == initialAttention) return@LaunchedEffect
