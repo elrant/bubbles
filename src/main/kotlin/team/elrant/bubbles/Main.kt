@@ -24,11 +24,9 @@ private enum class Backend { X11, Wayland }
 fun main(args: Array<String>) {
   val backend = configureBackend(parseBackend(args))
   val bubbles = Bubbles()
-  if (backend == Backend.Wayland) {
-    // Ctrl+C / `kill` must take the same orderly exit as closing the window, or the Wayland
-    // toolkit's shutdown hook deadlocks (see exitApplication).
-    for (signal in listOf("INT", "TERM")) Signal.handle(Signal(signal)) { exitApplication(bubbles) }
-  }
+  // Ctrl+C / `kill` must take the same orderly exit as closing the window: it saves the history and signs out
+  // cleanly, and under Wayland the toolkit's shutdown hook would otherwise deadlock (see exitApplication).
+  for (signal in listOf("INT", "TERM")) Signal.handle(Signal(signal)) { exitApplication(bubbles) }
   SwingUtilities.invokeLater { showBubbles(bubbles) }
 }
 

@@ -12,6 +12,12 @@ import org.jxmpp.jid.BareJid
  */
 data class OmemoIdentity(val jid: BareJid, val deviceId: Int, val fingerprint: String, val trust: Trust) {
   /**
+   * The device as an `xmpp:` URI with its fingerprint (`xmpp:jid?omemo-sid-<id>=<fingerprint>`), the form other OMEMO
+   * clients scan from a QR code to verify it.
+   */
+  val uri: String get() = "xmpp:$jid?omemo-sid-$deviceId=${fingerprint.lowercase()}"
+
+  /**
    * Whether messages are encrypted to a device.
    *
    * @property label user-facing name.

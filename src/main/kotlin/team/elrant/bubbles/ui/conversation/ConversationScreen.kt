@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -36,16 +37,22 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import team.elrant.bubbles.Bubbles
 import team.elrant.bubbles.model.ChatMessage
 import team.elrant.bubbles.model.Contact
+import team.elrant.bubbles.ui.components.Receipt
 import team.elrant.bubbles.ui.components.contextMenuBox
 import team.elrant.bubbles.ui.components.copyToClipboard
 import team.elrant.bubbles.ui.components.displayPicture
 import team.elrant.bubbles.ui.components.menuItem
+import team.elrant.bubbles.ui.components.receiptIcon
 import team.elrant.bubbles.ui.components.statusDot
 import team.elrant.bubbles.xmpp.ConnectedUser
 import java.time.Duration
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
@@ -53,16 +60,31 @@ private val TIME_24H = DateTimeFormatter.ofPattern("HH:mm")
 private val TIME_12H = DateTimeFormatter.ofPattern("h:mm a")
 private val DATE = DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT)
 
+/** How often the clock shown for the contact is refreshed. */
+private const val CLOCK_TICK_MS = 15_000L
+
+private val DAY_MONTH_YEAR = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+
+/** [this] formatted with [time], preceded by its date as `dd/mm/yyyy` unless it is today. */
+private fun LocalDateTime.stamp(time: DateTimeFormatter): String =
+  if (toLocalDate() == LocalDate.now()) format(time) else "${format(DAY_MONTH_YEAR)} ${format(time)}"
+
 /**
  * Conversation window contents: contact header, history, compose box and both display pictures.
  * The send shortcut, message grouping and time format follow [Bubbles.settings].
  */
 @Composable
 fun conversationScreen(bubbles: Bubbles, user: ConnectedUser, contact: Contact, modifier: Modifier = Modifier) {
-  val messages = bubbles.history(contact.jid)
+  val messages = bubbles.histories[contact.jid].orEmpty()
   val settings = bubbles.preferences.settings
   val time = if (settings.use24HourClock) TIME_24H else TIME_12H
   var draft by remember(contact.jid) { mutableStateOf("") }
+  val now by produceState(Instant.now()) {
+    while (true) {
+      delay(CLOCK_TICK_MS)
+      value = Instant.now()
+    }
+  }
 
   fun send() {
     val text = draft.trim()
@@ -74,7 +96,7 @@ fun conversationScreen(bubbles: Bubbles, user: ConnectedUser, contact: Contact, 
   Surface(modifier.fillMaxSize()) {
     Row {
       Column(Modifier.weight(1f).fillMaxHeight()) {
-        contactHeader(contact)
+        contactHeader(contact, bubbles.clocks.offset(contact.jid)?.let { "${now.atOffset(it).format(time)} (UTC$it)" })
         HorizontalDivider()
         history(
           messages,
@@ -100,9 +122,9 @@ fun conversationScreen(bubbles: Bubbles, user: ConnectedUser, contact: Contact, 
   }
 }
 
-/** The contact's name, status, personal message and JID. */
+/** The contact's name, status, personal message and JID, and [localTime] on their clock if known. */
 @Composable
-private fun contactHeader(contact: Contact) {
+private fun contactHeader(contact: Contact, localTime: String?) {
   Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
     Text(
       contact.displayName,
@@ -120,7 +142,7 @@ private fun contactHeader(contact: Contact) {
       )
     }
     Text(
-      "<${contact.jid}>",
+      listOfNotNull("<${contact.jid}>", localTime?.let { "Their time: $it" }).joinToString("  -  "),
       style = MaterialTheme.typography.labelSmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -162,7 +184,7 @@ private fun history(
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-              message.time.format(time),
+              message.time.stamp(time),
               style = MaterialTheme.typography.labelSmall,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -174,7 +196,7 @@ private fun history(
             menuItem(
               "Copy with sender and time",
               onClose = close,
-              onClick = { copyToClipboard("[${message.time.format(time)}] $sender: ${message.body}") },
+              onClick = { copyToClipboard("[${message.time.stamp(time)}] $sender: ${message.body}") },
             )
           },
         ) {
@@ -188,25 +210,43 @@ private fun history(
 /**
  * [message]'s text. Encryption is meant to be invisible, so a banner appears under it only when something is off:
  * it was sent or received as plain text, or it could not be sent.
+ * Outgoing messages also carry a [receiptIcon] showing whether they are sending, sent, read or failed.
  */
 @Composable
 private fun messageText(message: ChatMessage) {
   Column(Modifier.fillMaxWidth().padding(start = 16.dp, top = 2.dp)) {
-    Text(message.body)
+    Row(verticalAlignment = Alignment.Top) {
+      Text(message.body, Modifier.weight(1f))
+      if (message.outgoing) receiptIcon(message.receipt(), Modifier.padding(start = 6.dp, top = 4.dp))
+    }
     val banner = when {
       message.failed -> "Not sent"
-      message.pending || message.encrypted -> return@Column
+      message.pending || message.encrypted -> null
       else -> "Not encrypted"
     }
-    val colors = MaterialTheme.colorScheme
-    Surface(
-      Modifier.padding(top = 2.dp),
-      shape = MaterialTheme.shapes.extraSmall,
-      color = if (message.failed) colors.errorContainer else colors.surfaceVariant,
-      contentColor = if (message.failed) colors.onErrorContainer else colors.onSurfaceVariant,
-    ) {
-      Text(banner, Modifier.padding(horizontal = 6.dp, vertical = 1.dp), style = MaterialTheme.typography.labelSmall)
-    }
+    if (banner != null) banner(banner, isError = message.failed)
+  }
+}
+
+/** How far this outgoing message has got. */
+private fun ChatMessage.receipt(): Receipt = when {
+  failed -> Receipt.Failed
+  pending -> Receipt.Sending
+  read -> Receipt.Read
+  else -> Receipt.Sent
+}
+
+/** A small label with [text] under a message; red if [isError]. */
+@Composable
+private fun banner(text: String, isError: Boolean) {
+  val colors = MaterialTheme.colorScheme
+  Surface(
+    Modifier.padding(top = 2.dp),
+    shape = MaterialTheme.shapes.extraSmall,
+    color = if (isError) colors.errorContainer else colors.surfaceVariant,
+    contentColor = if (isError) colors.onErrorContainer else colors.onSurfaceVariant,
+  ) {
+    Text(text, Modifier.padding(horizontal = 6.dp, vertical = 1.dp), style = MaterialTheme.typography.labelSmall)
   }
 }
 

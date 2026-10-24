@@ -15,6 +15,8 @@ package team.elrant.bubbles.model
  * @property requestAttention ask the desktop to flag the conversation window when a message arrives.
  * @property encryptMessages encrypt outgoing messages with OMEMO whenever the contact supports it; otherwise they
  *   are sent as plain text.
+ * @property sendReadReceipts tell contacts (chat markers, XEP-0333) when their messages are on screen in a focused
+ *   conversation window.
  * @property requireDeviceApproval a contact's OMEMO device seen for the first time is not trusted until approved,
  *   instead of being trusted on first use.
  * @property groupOrder order of roster groups in the contact list; groups not listed follow, by name.
@@ -29,6 +31,7 @@ data class Settings(
   val raiseOnMessage: Boolean = false,
   val requestAttention: Boolean = true,
   val encryptMessages: Boolean = true,
+  val sendReadReceipts: Boolean = true,
   val requireDeviceApproval: Boolean = false,
   val groupOrder: List<String> = emptyList(),
 ) {

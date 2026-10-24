@@ -31,6 +31,7 @@ import kotlinx.coroutines.launch
 import org.jxmpp.jid.BareJid
 import team.elrant.bubbles.Bubbles
 import team.elrant.bubbles.model.OmemoIdentity
+import team.elrant.bubbles.ui.components.qrCode
 
 /** Characters per group when a fingerprint is shown, as other OMEMO clients do. */
 private const val FINGERPRINT_BLOCK = 8
@@ -77,6 +78,7 @@ private fun thisDevice(own: OmemoIdentity?) {
     } else {
       Text("Device ${own.deviceId}", style = MaterialTheme.typography.labelLarge)
       fingerprintText(own.fingerprint)
+      qrToggle(own)
     }
   }
 }
@@ -142,6 +144,7 @@ private fun identityRow(identity: OmemoIdentity, onDecide: (trusted: Boolean) ->
   Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
     Text("Device ${identity.deviceId} - ${identity.trust.label}", style = MaterialTheme.typography.labelLarge)
     fingerprintText(identity.fingerprint)
+    qrToggle(identity)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       OutlinedButton(onClick = { onDecide(true) }, enabled = identity.trust != OmemoIdentity.Trust.Trusted) {
         Text("Trust")
@@ -150,6 +153,16 @@ private fun identityRow(identity: OmemoIdentity, onDecide: (trusted: Boolean) ->
         Text("Don't trust")
       }
     }
+  }
+}
+
+/** A button that shows or hides a QR code of [identity], for another device to scan to compare fingerprints. */
+@Composable
+private fun qrToggle(identity: OmemoIdentity, modifier: Modifier = Modifier) {
+  var shown by remember(identity.uri) { mutableStateOf(false) }
+  Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    TextButton(onClick = { shown = !shown }) { Text(if (shown) "Hide QR code" else "Show QR code") }
+    if (shown) qrCode(identity.uri)
   }
 }
 

@@ -18,6 +18,7 @@ import org.jetbrains.skia.Image
 import org.jivesoftware.smack.SmackException
 import org.jivesoftware.smack.XMPPException
 import org.jxmpp.jid.BareJid
+import org.jxmpp.jid.EntityBareJid
 import org.jxmpp.jid.impl.JidCreate
 import org.jxmpp.stringprep.XmppStringprepException
 import org.slf4j.LoggerFactory
@@ -54,6 +55,9 @@ class Bubbles(accounts: AccountStore = AccountStore(), settingsStore: SettingsSt
   /** Passwords remembered in the system keyring. */
   val credentials = Credentials()
 
+  /** The local time of contacts, as they report it. */
+  val clocks = ContactClocks(scope) { user }
+
   /** The signed-in account, or `null` while on the sign-in screen. */
   var user by mutableStateOf<ConnectedUser?>(null)
     private set
@@ -73,7 +77,10 @@ class Bubbles(accounts: AccountStore = AccountStore(), settingsStore: SettingsSt
   /** Contacts with an open conversation window, in opening order. */
   val conversations: List<BareJid>
     field = mutableStateListOf<BareJid>()
-  private val histories = mutableStateMapOf<BareJid, SnapshotStateList<ChatMessage>>()
+
+  /** The messages exchanged with each contact since sign-in, oldest first; contacts without any are absent. */
+  val histories: Map<BareJid, List<ChatMessage>>
+    field = mutableStateMapOf<BareJid, SnapshotStateList<ChatMessage>>()
 
   /** Messages received per contact since their conversation was last opened; contacts without any are absent. */
   val unread: Map<BareJid, Int>
@@ -86,14 +93,23 @@ class Bubbles(accounts: AccountStore = AccountStore(), settingsStore: SettingsSt
   val incoming: Map<BareJid, Int>
     field = mutableStateMapOf<BareJid, Int>()
 
+  /** Contacts whose archived history has been requested since sign-in, so it is fetched once per conversation. */
+  private val pulled = mutableSetOf<BareJid>()
+
+  /** Saves the histories; started once the saved history has been loaded safely. */
+  private val historyKeeper = HistoryKeeper(scope) { histories }
+
+  /** Contacts whose conversation window has the focus, i.e. whose latest messages are being read. */
+  private val focused = mutableSetOf<BareJid>()
+
+  /** The stanza id of the last message of each contact that we sent a read receipt for. */
+  private val acknowledged = mutableMapOf<BareJid, String>()
+
   private val avatars = mutableStateMapOf<BareJid, ImageBitmap>()
 
   /** The photo hash each avatar was last requested for (`null`: not known); see [requestAvatar]. */
   private val requestedAvatars = mutableMapOf<BareJid, String?>()
   private val avatarDispatcher = Dispatchers.IO.limitedParallelism(4)
-
-  /** Read-only view; does not create an entry, so it is safe to call during composition. */
-  fun history(contact: BareJid): List<ChatMessage> = histories[contact].orEmpty()
 
   /** The display picture of [jid] (a contact or ourselves), or `null` if there is none or it hasn't loaded yet. */
   fun avatar(jid: BareJid): ImageBitmap? = avatars[jid]
@@ -126,17 +142,7 @@ class Bubbles(accounts: AccountStore = AccountStore(), settingsStore: SettingsSt
     }
     logger.info("Attempting sign-in for: {}", jid)
 
-    // The callbacks drop events from a connection that is no longer (or not yet) the signed-in user.
-    val connected = ConnectedUser(
-      username = jid.localpart.toString(),
-      password = password,
-      serviceName = jid.domain.toString(),
-      onMessage = { source, from, body, encrypted ->
-        scope.launch { if (user === source) receive(from, body, encrypted) }
-      },
-      onRosterChanged = { source -> scope.launch { if (user === source) updateContacts(source) } },
-      requireApproval = { preferences.settings.requireDeviceApproval },
-    )
+    val connected = newConnection(jid, password)
     connect(connected, status)
 
     preferences.rememberAddress(address.takeIf { rememberMe })
@@ -147,6 +153,8 @@ class Bubbles(accounts: AccountStore = AccountStore(), settingsStore: SettingsSt
     requestAvatar(connected, connected.jid, null)
     updateContacts(connected)
     logger.info("Roster: {}", contacts)
+    historyKeeper.restore(connected, { user }, ::merge)
+    pullHistory(connected, null)
   }
 
   /**
@@ -156,17 +164,38 @@ class Bubbles(accounts: AccountStore = AccountStore(), settingsStore: SettingsSt
   fun signOut() {
     val current = user ?: return
     user = null
+    historyKeeper.finish()
     contacts = emptyList()
     conversations.clear()
     histories.clear()
     unread.clear()
     incoming.clear()
+    pulled.clear()
+    clocks.clear()
+    focused.clear()
+    acknowledged.clear()
     avatars.clear()
     requestedAvatars.clear()
     status = Status.Available
     personalMessage = ""
     disconnectInBackground(current)
   }
+
+  /**
+   * A not yet connected [ConnectedUser] for [jid]. Its callbacks drop events from a connection that is no longer (or
+   * not yet) the signed-in user.
+   */
+  private fun newConnection(jid: EntityBareJid, password: String) = ConnectedUser(
+    username = jid.localpart.toString(),
+    password = password,
+    serviceName = jid.domain.toString(),
+    onMessage = { source, from, message -> scope.launch { if (user === source) receive(from, message) } },
+    onRead = { source, contact, id -> scope.launch { if (user === source) markSeen(contact, id) } },
+    onReadElsewhere = { source, contact, id -> scope.launch { if (user === source) readElsewhere(contact, id) } },
+    onSynced = { source, contact, messages -> scope.launch { if (user === source) merge(contact, messages) } },
+    onRosterChanged = { source -> scope.launch { if (user === source) updateContacts(source) } },
+    requireApproval = { preferences.settings.requireDeviceApproval },
+  )
 
   /**
    * Connects and logs in [connected], then publishes [status] unless it is the default. On any
@@ -254,12 +283,17 @@ class Bubbles(accounts: AccountStore = AccountStore(), settingsStore: SettingsSt
   fun openConversation(jid: BareJid) {
     if (jid !in conversations) conversations += jid
     unread -= jid
-    user?.let { requestAvatar(it, jid, contact(jid).avatarHash) }
+    user?.let {
+      requestAvatar(it, jid, contact(jid).avatarHash)
+      pullHistory(it, jid)
+      clocks.request(it, jid)
+    }
   }
 
   /** Closes the conversation window with [jid]. Its history is kept until sign-out. */
   fun closeConversation(jid: BareJid) {
     conversations -= jid
+    focused -= jid
   }
 
   /**
@@ -273,14 +307,16 @@ class Bubbles(accounts: AccountStore = AccountStore(), settingsStore: SettingsSt
     history += pending
     val encrypt = preferences.settings.encryptMessages
     scope.launch {
-      val result = withContext(Dispatchers.IO) { current.sendMessage(to, text, encrypt) }
+      val report = withContext(Dispatchers.IO) { current.sendMessage(to, text, encrypt) }
       val index = history.indexOf(pending)
       if (index >= 0) {
         history[index] = pending.copy(
-          encrypted = result == SendResult.Encrypted,
-          failed = result == SendResult.Failed,
+          encrypted = report.result == SendResult.Encrypted,
+          failed = report.result == SendResult.Failed,
           pending = false,
+          id = report.id,
         )
+        historyKeeper.schedule()
       }
     }
   }
@@ -289,13 +325,101 @@ class Bubbles(accounts: AccountStore = AccountStore(), settingsStore: SettingsSt
    * Records an incoming message. Its conversation window is popped up, or, if it is closed and
    * [Settings.openOnMessage] is off, the contact is marked unread.
    */
-  private fun receive(from: BareJid, body: String, encrypted: Boolean) {
-    mutableHistory(from) += ChatMessage(body, outgoing = false, encrypted = encrypted)
+  private fun receive(from: BareJid, message: ChatMessage) {
+    val history = mutableHistory(from)
+    // The same message can reach us more than once, e.g. as an offline message and from the archive.
+    if (message.id != null && history.any { it.id == message.id }) return
+    history += message
+    historyKeeper.schedule()
     incoming[from] = (incoming[from] ?: 0) + 1
     if (from in conversations || preferences.settings.openOnMessage) {
       openConversation(from)
     } else {
       unread[from] = (unread[from] ?: 0) + 1
+    }
+    if (from in focused) acknowledgeRead(from)
+  }
+
+  /**
+   * Tells the conversation with [jid] whether its window has the focus. While it has, incoming messages count as
+   * read and are acknowledged to the contact (see [Settings.sendReadReceipts]).
+   */
+  fun conversationFocused(jid: BareJid, hasFocus: Boolean) {
+    if (hasFocus) {
+      focused += jid
+      acknowledgeRead(jid)
+    } else {
+      focused -= jid
+    }
+  }
+
+  /** Sends a read receipt for the latest message from [jid], unless disabled, not asked for, or already sent. */
+  private fun acknowledgeRead(jid: BareJid) {
+    val current = user
+    val latest = histories[jid]?.lastOrNull { !it.outgoing }
+    val id = latest?.id
+    if (current == null || !preferences.settings.sendReadReceipts || id == null) return
+    if (!latest.markable || acknowledged[jid] == id) return
+    acknowledged[jid] = id
+    scope.launch(Dispatchers.IO) { current.readReceipts.markDisplayed(jid, id) }
+  }
+
+  /**
+   * Another device of ours has read the conversation with [contact] up to their message [id]: it needs no unread mark
+   * here, and no receipt from us.
+   */
+  private fun readElsewhere(contact: BareJid, id: String) {
+    acknowledged[contact] = id
+    unread -= contact
+  }
+
+  /** Marks our messages to [contact] up to the one with stanza id [id] as read. */
+  private fun markSeen(contact: BareJid, id: String) {
+    val history = mutableHistory(contact)
+    val seen = history.indexOfFirst { it.id == id }
+    if (seen < 0) return
+    var changed = false
+    for (index in 0..seen) {
+      if (history[index].outgoing && !history[index].read) {
+        history[index] = history[index].copy(read = true)
+        changed = true
+      }
+    }
+    if (changed) historyKeeper.schedule()
+  }
+
+  /**
+   * Adds [messages] to the history with [contact] in time order, skipping ones already there. Unlike [receive], this
+   * never marks anything unread or opens a window: these messages are old or were sent by us.
+   */
+  private fun merge(contact: BareJid, messages: List<ChatMessage>) {
+    val history = mutableHistory(contact)
+    val known = history.mapNotNullTo(mutableSetOf()) { it.id }
+    val fresh = messages.filter { it.id == null || known.add(it.id) }
+    if (fresh.isEmpty()) return
+    history += fresh
+    history.sortBy { it.time }
+    historyKeeper.schedule()
+  }
+
+  /**
+   * Fetches archived messages from the server in the background and merges them into the histories: the latest ones
+   * with anybody if [contact] is `null`, else with [contact], once per sign-in. Failures are only logged; a failed
+   * contact is retried the next time its conversation is opened.
+   */
+  private fun pullHistory(connected: ConnectedUser, contact: BareJid?) {
+    if (contact != null && !pulled.add(contact)) return
+    scope.launch {
+      try {
+        val fetched = runInterruptible(Dispatchers.IO) { connected.archive?.fetch(contact, HISTORY_PAGE).orEmpty() }
+        if (user === connected) fetched.forEach { (jid, messages) -> merge(jid, messages) }
+      } catch (e: SmackException) {
+        logger.warn("Could not pull the message history: {}", e.message)
+        if (contact != null) pulled -= contact
+      } catch (e: XMPPException) {
+        logger.warn("Server refused the message history: {}", e.message)
+        if (contact != null) pulled -= contact
+      }
     }
   }
 
@@ -351,6 +475,12 @@ class Bubbles(accounts: AccountStore = AccountStore(), settingsStore: SettingsSt
   /** Disconnects for good. Blocking; the UI exits the process afterwards (see `exitApplication`). */
   fun shutdown() {
     logger.info("Shutting down Bubbles...")
+    historyKeeper.finishBlocking()
     runCatching { user?.disconnect() }
+  }
+
+  private companion object {
+    /** How many of the most recent archived messages one history request asks for. */
+    const val HISTORY_PAGE = 50
   }
 }
