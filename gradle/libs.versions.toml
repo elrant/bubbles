@@ -14,6 +14,8 @@ jxmpp = "1.1.0"
 mdns = "1.1.1"
 smack = "4.5.0-rc1"
 bcprov = "1.85"
+signal = "2.8.1"
+dbus = "5.2.2"
 
 # kotlin / compose
 kotlin = "2.4.21"
@@ -50,6 +52,11 @@ smack-core    = { group = "org.igniterealtime.smack", name = "smack-core"       
 smack-stream  = { group = "org.igniterealtime.smack", name = "smack-streammanagement", version.ref = "smack"  }
 smack-tcp     = { group = "org.igniterealtime.smack", name = "smack-tcp"             , version.ref = "smack"  }
 smack-ext     = { group = "org.igniterealtime.smack", name = "smack-extensions"      , version.ref = "smack"  }
+smack-omemo        = { group = "org.igniterealtime.smack", name = "smack-omemo"        , version.ref = "smack"  }
+smack-omemo-signal = { group = "org.igniterealtime.smack", name = "smack-omemo-signal" , version.ref = "smack"  }
+dbus-core          = { group = "com.github.hypfvieh"     , name = "dbus-java-core"                       , version.ref = "dbus"   }
+dbus-unixsocket    = { group = "com.github.hypfvieh"     , name = "dbus-java-transport-native-unixsocket", version.ref = "dbus"   }
+signal        = { group = "org.whispersystems"      , name = "signal-protocol-java"  , version.ref = "signal" }
 bcprov        = { group = "org.bouncycastle"        , name = "bcprov-jdk18on"        , version.ref = "bcprov" }
 
 # lint
@@ -93,7 +100,15 @@ xmpp = [
   "smack-minidns",
   "smack-tcp",
   "smack-ext",
+  "smack-omemo",
+  "smack-omemo-signal",
+  "signal",
   "bcprov"
+]
+
+secrets = [
+  "dbus-core",
+  "dbus-unixsocket"
 ]
 
 coroutines = [
