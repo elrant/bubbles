@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image
 import org.jivesoftware.smack.SmackException
 import org.jivesoftware.smack.XMPPException
@@ -27,6 +28,7 @@ import team.elrant.bubbles.model.Status
 import team.elrant.bubbles.store.AccountStore
 import team.elrant.bubbles.store.SettingsStore
 import team.elrant.bubbles.xmpp.ConnectedUser
+import team.elrant.bubbles.xmpp.SendResult
 import java.io.IOException
 
 /**
@@ -116,7 +118,9 @@ class Bubbles(accounts: AccountStore = AccountStore(), settingsStore: SettingsSt
       username = jid.localpart.toString(),
       password = password,
       serviceName = jid.domain.toString(),
-      onMessage = { source, from, body -> scope.launch { if (user === source) receive(from, body) } },
+      onMessage = { source, from, body, encrypted ->
+        scope.launch { if (user === source) receive(from, body, encrypted) }
+      },
       onRosterChanged = { source -> scope.launch { if (user === source) updateContacts(source) } },
     )
     connect(connected, status)
@@ -243,19 +247,31 @@ class Bubbles(accounts: AccountStore = AccountStore(), settingsStore: SettingsSt
     conversations -= jid
   }
 
-  /** Adds [text] to the history with [to] and sends it in the background. */
+  /**
+   * Adds [text] to the history with [to] and sends it in the background, encrypted if [Settings.encryptMessages] is
+   * on and the contact supports it. The history entry then shows whether it was encrypted, or that it failed.
+   */
   fun sendMessage(to: BareJid, text: String) {
     val current = user ?: return
-    mutableHistory(to) += ChatMessage(text, outgoing = true)
-    scope.launch(Dispatchers.IO) { current.sendMessage(to, text) }
+    val history = mutableHistory(to)
+    val pending = ChatMessage(text, outgoing = true)
+    history += pending
+    val encrypt = preferences.settings.encryptMessages
+    scope.launch {
+      val result = withContext(Dispatchers.IO) { current.sendMessage(to, text, encrypt) }
+      val index = history.indexOf(pending)
+      if (index >= 0) {
+        history[index] = pending.copy(encrypted = result == SendResult.Encrypted, failed = result == SendResult.Failed)
+      }
+    }
   }
 
   /**
    * Records an incoming message. Its conversation window is popped up, or, if it is closed and
    * [Settings.openOnMessage] is off, the contact is marked unread.
    */
-  private fun receive(from: BareJid, body: String) {
-    mutableHistory(from) += ChatMessage(body, outgoing = false)
+  private fun receive(from: BareJid, body: String, encrypted: Boolean) {
+    mutableHistory(from) += ChatMessage(body, outgoing = false, encrypted = encrypted)
     incoming[from] = (incoming[from] ?: 0) + 1
     if (from in conversations || preferences.settings.openOnMessage) {
       openConversation(from)

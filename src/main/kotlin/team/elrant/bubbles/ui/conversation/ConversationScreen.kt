@@ -178,10 +178,28 @@ private fun history(
             )
           },
         ) {
-          Text(message.body, Modifier.fillMaxWidth().padding(start = 16.dp, top = 2.dp))
+          messageText(message)
         }
       }
     }
+  }
+}
+
+/** [message]'s text, with a note underneath if it was sent encrypted or could not be sent. */
+@Composable
+private fun messageText(message: ChatMessage) {
+  Column(Modifier.fillMaxWidth().padding(start = 16.dp, top = 2.dp)) {
+    Text(message.body)
+    val note = when {
+      message.failed -> "Not sent"
+      message.encrypted -> "Encrypted with OMEMO"
+      else -> return@Column
+    }
+    Text(
+      note,
+      style = MaterialTheme.typography.labelSmall,
+      color = if (message.failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+    )
   }
 }
 
