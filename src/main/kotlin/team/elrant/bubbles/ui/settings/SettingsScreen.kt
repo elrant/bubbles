@@ -32,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import team.elrant.bubbles.Bubbles
 import team.elrant.bubbles.model.Accent
 import team.elrant.bubbles.model.Flavor
@@ -58,6 +60,7 @@ import team.elrant.bubbles.ui.theme.accentColor
 fun settingsScreen(bubbles: Bubbles, onBack: () -> Unit, onOpenEncryption: () -> Unit, modifier: Modifier = Modifier) {
   val settings = bubbles.preferences.settings
   val update = bubbles.preferences::update
+  val scope = rememberCoroutineScope()
   Surface(modifier.fillMaxSize()) {
     Column {
       topBar(onBack)
@@ -70,7 +73,12 @@ fun settingsScreen(bubbles: Bubbles, onBack: () -> Unit, onOpenEncryption: () ->
         accountSection(
           savedAddress = bubbles.preferences.savedAddress,
           signedInAs = bubbles.user?.address,
-          onForget = bubbles.preferences::forgetAddress,
+          onForget = {
+            scope.launch {
+              bubbles.preferences.savedAddress?.let { bubbles.credentials.forget(it) }
+              bubbles.preferences.forgetAddress()
+            }
+          },
         )
         HorizontalDivider()
         privacySection(settings, update, canManageKeys = bubbles.user != null, onOpenEncryption = onOpenEncryption)
@@ -139,13 +147,15 @@ private fun accentSwatches(flavor: Flavor, selected: Accent, onSelect: (Accent) 
   }
 }
 
-/** The remembered address with a button to forget it, and the signed-in account if any. */
+/** The remembered address with a button to forget it and its kept password, and the signed-in account if any. */
 @Composable
 private fun accountSection(savedAddress: String?, signedInAs: String?, onForget: () -> Unit) {
   section("Account") {
     signedInAs?.let { Text("Signed in as $it") }
     Text("Remembered address: ${savedAddress ?: "none"}")
-    OutlinedButton(onClick = onForget, enabled = savedAddress != null) { Text("Forget remembered address") }
+    OutlinedButton(onClick = onForget, enabled = savedAddress != null) {
+      Text("Forget remembered address and password")
+    }
   }
 }
 

@@ -23,6 +23,7 @@ dependencies {
   implementation(libs.bundles.serialization)
   implementation(libs.bundles.logging)
   implementation(libs.bundles.xmpp)
+  implementation(libs.bundles.secrets)
   implementation(libs.bundles.coroutines)
 
   detektPlugins(libs.detekt.ktlint)

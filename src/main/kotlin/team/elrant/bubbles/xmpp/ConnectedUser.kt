@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory
 import team.elrant.bubbles.model.Contact
 import team.elrant.bubbles.model.OmemoIdentity
 import team.elrant.bubbles.model.Status
-import team.elrant.bubbles.store.omemoDirectory
+import team.elrant.bubbles.store.OmemoVault
 import java.io.IOException
 import java.net.InetAddress
 import java.security.Security
@@ -78,6 +78,7 @@ class ConnectedUser(
   private var vCards: VCardManager? = null
   private var omemo: OmemoManager? = null
   private var trust: DeviceTrust? = null
+  private var vault: OmemoVault? = null
 
   /** The account's bare JID, `username@serviceName`. */
   val address: String get() = "$username@$serviceName"
@@ -133,6 +134,10 @@ class ConnectedUser(
     }
     vCards = VCardManager.getInstanceFor(conn)
     omemo = setUpOmemo(conn)
+    if (omemo == null) {
+      vault?.close()
+      vault = null
+    }
   }
 
   /**
@@ -142,10 +147,13 @@ class ConnectedUser(
   private fun setUpOmemo(conn: XMPPTCPConnection): OmemoManager? = try {
     SignalOmemoService.acknowledgeLicense()
     SignalOmemoService.setup()
+    val keys = OmemoVault(address)
+    val directory = keys.open()
+    vault = keys
     (SignalOmemoService.getInstance() as SignalOmemoService).omemoStoreBackend =
-      SignalFileBasedOmemoStore(omemoDirectory(address).toFile())
+      SignalFileBasedOmemoStore(directory.toFile())
     OmemoManager.getInstanceFor(conn).also { manager ->
-      val deviceTrust = DeviceTrust(omemoDirectory(address).resolve("trust.json"), requireApproval)
+      val deviceTrust = DeviceTrust(directory.resolve("trust.json"), requireApproval)
       trust = deviceTrust
       manager.setTrustCallback(deviceTrust)
       manager.addOmemoMessageListener(object : OmemoMessageListener {
@@ -154,6 +162,7 @@ class ConnectedUser(
           val from = (stanza as? Message)?.from?.asBareJid() ?: return
           logger.info("Received encrypted message from {}", from)
           onMessage(this@ConnectedUser, from, body, true)
+          sealKeys()
         }
 
         override fun onOmemoCarbonCopyReceived(
@@ -164,6 +173,7 @@ class ConnectedUser(
         ) = Unit
       })
       manager.initialize()
+      sealKeys()
       logger.info("OMEMO ready, device {}", manager.deviceId)
     }
   } catch (e: SmackException) {
@@ -258,6 +268,7 @@ class ConnectedUser(
           logger.warn("Not encrypted for all devices of {}: {}", contact, sent.skippedDevices)
         }
         conn.sendStanza(sent.buildMessage(conn.stanzaFactory.buildMessageStanza(), entity))
+        sealKeys()
         SendResult.Encrypted
       } else {
         chat?.chatWith(entity)?.send(message)
@@ -325,6 +336,7 @@ class ConnectedUser(
     val device = OmemoDevice(identity.jid, identity.deviceId)
     val fingerprint = OmemoFingerprint(identity.fingerprint)
     if (trusted) manager.trustOmemoIdentity(device, fingerprint) else manager.distrustOmemoIdentity(device, fingerprint)
+    sealKeys()
   }
 
   /**
@@ -345,6 +357,17 @@ class ConnectedUser(
   /** Closes the connection. Blocking. */
   fun disconnect() {
     connection?.disconnect()
+    vault?.close()
+    vault = null
+  }
+
+  /** Saves the OMEMO keys back into the encrypted vault; a failure is logged, since the keys stay in memory. */
+  private fun sealKeys() {
+    try {
+      vault?.flush()
+    } catch (e: IOException) {
+      logger.error("Could not save the OMEMO keys: {}", e.message)
+    }
   }
 
   companion object {

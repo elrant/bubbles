@@ -73,7 +73,7 @@ private fun thisDevice(own: OmemoIdentity?) {
   Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
     Text("This device", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
     if (own == null) {
-      Text("OMEMO isn't running for this account.")
+      Text("OMEMO isn't running. It needs a keyring (Secret Service), such as GNOME Keyring, to protect its keys.")
     } else {
       Text("Device ${own.deviceId}", style = MaterialTheme.typography.labelLarge)
       fingerprintText(own.fingerprint)
