@@ -177,20 +177,21 @@ class ConnectedUser(
       logger.info("OMEMO ready, device {}", manager.deviceId)
     }
   } catch (e: SmackException) {
-    logger.warn(OMEMO_UNAVAILABLE, e.message)
-    null
+    omemoUnavailable("server error", e)
   } catch (e: XMPPException) {
-    logger.warn(OMEMO_UNAVAILABLE, e.message)
-    null
+    omemoUnavailable("server refused", e)
   } catch (e: CorruptedOmemoKeyException) {
-    logger.warn("OMEMO unavailable, stored keys are corrupted: {}", e.message)
-    null
+    omemoUnavailable("stored keys are corrupted", e)
   } catch (e: PubSubException.NotALeafNodeException) {
-    logger.warn("OMEMO unavailable, the server's PEP node is not a leaf: {}", e.message)
-    null
+    omemoUnavailable("the server's PEP node is not a leaf", e)
   } catch (e: IOException) {
-    logger.warn(OMEMO_UNAVAILABLE, e.message)
-    null
+    omemoUnavailable("keys can't be stored safely", e)
+  }
+
+  /** Logs why OMEMO can't run, for [reason], and returns no manager. */
+  private fun omemoUnavailable(reason: String, cause: Exception): OmemoManager? {
+    logger.warn("OMEMO unavailable, {}: {}", reason, cause.message)
+    return null
   }
 
   /** Snapshot of the roster with each contact's current presence; empty before [initializeConnection]. */
@@ -275,28 +276,27 @@ class ConnectedUser(
         SendResult.Plain
       }
     } catch (e: SmackException) {
-      logger.error(SEND_ERROR, e.message)
-      SendResult.Failed
+      sendFailed(contact, "connection problem", e)
     } catch (e: XMPPException) {
-      logger.error(SEND_ERROR, e.message)
-      SendResult.Failed
+      sendFailed(contact, "server refused it", e)
     } catch (e: UndecidedOmemoIdentityException) {
-      logger.error("Not sending to {}, undecided OMEMO identities: {}", contact, e.undecidedDevices)
-      SendResult.Failed
+      sendFailed(contact, "undecided OMEMO identities ${e.undecidedDevices}", e)
     } catch (e: CryptoFailedException) {
-      logger.error("Could not encrypt the message to {}: {}", contact, e.message)
-      SendResult.Failed
+      sendFailed(contact, "encryption failed", e)
     } catch (e: PubSubException.NotALeafNodeException) {
-      logger.error("Could not look up OMEMO devices of {}: {}", contact, e.message)
-      SendResult.Failed
+      sendFailed(contact, "OMEMO devices couldn't be looked up", e)
     } catch (e: IOException) {
-      logger.error(SEND_ERROR, e.message)
-      SendResult.Failed
+      sendFailed(contact, "I/O error", e)
     } catch (e: InterruptedException) {
       Thread.currentThread().interrupt()
-      logger.error("Interrupted while sending XMPP message: {}", e.message)
-      SendResult.Failed
+      sendFailed(contact, "interrupted", e)
     }
+  }
+
+  /** Logs that a message to [contact] wasn't sent, for [reason], and reports the failure. */
+  private fun sendFailed(contact: BareJid, reason: String, cause: Exception): SendResult {
+    logger.error("Could not send a message to {}: {}: {}", contact, reason, cause.message)
+    return SendResult.Failed
   }
 
   /**
@@ -372,9 +372,6 @@ class ConnectedUser(
 
   companion object {
     private val logger = LoggerFactory.getLogger(ConnectedUser::class.java)
-
-    private const val OMEMO_UNAVAILABLE = "OMEMO unavailable: {}"
-    private const val SEND_ERROR = "Error sending XMPP message: {}"
 
     /** `subjectAltName` type of a DNS name (RFC 5280 GeneralName `dNSName`). */
     private const val DNS_NAME = 2
