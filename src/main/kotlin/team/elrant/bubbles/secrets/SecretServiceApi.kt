@@ -78,7 +78,8 @@ internal interface PromptApi : DBusInterface {
 
 /** A secret on the wire: `(oayays)`. */
 internal class Secret(
-  @field:Position(0) @JvmField val session: DBusPath,
+  // Read by dbus-java when it marshals the struct; nothing here needs to look at it.
+  @Suppress("unused") @field:Position(0) @JvmField val session: DBusPath,
   @field:Position(1) @JvmField val parameters: ByteArray,
   @field:Position(2) @JvmField val value: ByteArray,
   @field:Position(CONTENT_TYPE_POSITION) @JvmField val contentType: String,
@@ -98,7 +99,8 @@ internal class SearchResult(
 
 /** Reply of [ServiceApi.unlock]. */
 internal class UnlockResult(
-  @field:Position(0) @JvmField val unlocked: List<DBusPath>,
+  // Filled in by dbus-java. Not checked: services differ in whether an already unlocked object is listed.
+  @Suppress("unused") @field:Position(0) @JvmField val unlocked: List<DBusPath>,
   @field:Position(1) @JvmField val prompt: DBusPath,
 ) : Tuple()
 
