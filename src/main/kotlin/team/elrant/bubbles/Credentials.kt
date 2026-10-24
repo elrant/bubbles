@@ -11,6 +11,8 @@ import team.elrant.bubbles.secrets.KeyringException
  * unlock the keyring. A keyring that can't be used is logged and treated as if nothing were stored.
  */
 class Credentials {
+  private var autoSignInClaimed = false
+
   /** The password saved for [address], or `null` if there is none or the keyring is unavailable. */
   suspend fun saved(address: String): String? = try {
     runInterruptible(Dispatchers.IO) { Keyring.open().use { it.get(address, KIND) } }?.decodeToString()
@@ -38,6 +40,9 @@ class Credentials {
       logger.warn("Could not delete the saved password of {}: {}", address, e.message)
     }
   }
+
+  /** `true` the first time it is called in a run, `false` after: only the first sign-in screen signs in by itself. */
+  fun claimAutoSignIn(): Boolean = !autoSignInClaimed.also { autoSignInClaimed = true }
 
   private companion object {
     val logger = LoggerFactory.getLogger(Credentials::class.java)
