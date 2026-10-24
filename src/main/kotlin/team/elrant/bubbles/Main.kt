@@ -22,12 +22,12 @@ private enum class Backend { X11, Wayland }
 
 /** Entry point: picks the windowing backend from [args], then opens the UI. */
 fun main(args: Array<String>) {
-  val backend = configureBackend(parseBackend(args))
-  val bubbles = Bubbles()
-  // Ctrl+C / `kill` must take the same orderly exit as closing the window: it saves the history and signs out
-  // cleanly, and under Wayland the toolkit's shutdown hook would otherwise deadlock (see exitApplication).
-  for (signal in listOf("INT", "TERM")) Signal.handle(Signal(signal)) { exitApplication(bubbles) }
-  SwingUtilities.invokeLater { showBubbles(bubbles) }
+    val backend = configureBackend(parseBackend(args))
+    val bubbles = Bubbles()
+    // Ctrl+C / `kill` must take the same orderly exit as closing the window: it saves the history and signs out
+    // cleanly, and under Wayland the toolkit's shutdown hook would otherwise deadlock (see exitApplication).
+    for (signal in listOf("INT", "TERM")) Signal.handle(Signal(signal)) { exitApplication(bubbles) }
+    SwingUtilities.invokeLater { showBubbles(bubbles) }
 }
 
 /**
@@ -35,30 +35,30 @@ fun main(args: Array<String>) {
  * process for `--help` and for invalid arguments.
  */
 private fun parseBackend(args: Array<String>): Backend {
-  var backend: Backend? = null
-  for (arg in args) {
-    val choice = when (arg) {
-      "--x11" -> Backend.X11
-      "--wayland" -> Backend.Wayland
-      "--help", "-h" -> printHelpAndExit()
-      else -> usageError("unknown option '$arg'")
+    var backend: Backend? = null
+    for (arg in args) {
+        val choice = when (arg) {
+            "--x11" -> Backend.X11
+            "--wayland" -> Backend.Wayland
+            "--help", "-h" -> printHelpAndExit()
+            else -> usageError("unknown option '$arg'")
+        }
+        if (backend != null && backend != choice) usageError("--x11 and --wayland are mutually exclusive")
+        backend = choice
     }
-    if (backend != null && backend != choice) usageError("--x11 and --wayland are mutually exclusive")
-    backend = choice
-  }
-  return backend ?: Backend.X11
+    return backend ?: Backend.X11
 }
 
 /** Prints the usage to stdout, then exits with status 0. */
 private fun printHelpAndExit(): Nothing {
-  println(USAGE)
-  exitProcess(0)
+    println(USAGE)
+    exitProcess(0)
 }
 
 /** Prints [message] and the usage to stderr, then exits with status 2. */
 private fun usageError(message: String): Nothing {
-  System.err.println("bubbles: $message\n\n$USAGE")
-  exitProcess(2)
+    System.err.println("bubbles: $message\n\n$USAGE")
+    exitProcess(2)
 }
 
 /**
@@ -72,24 +72,24 @@ private fun usageError(message: String): Nothing {
  * @return the backend actually used: Wayland falls back to X11 when `WAYLAND_DISPLAY` is unset.
  */
 private fun configureBackend(requested: Backend): Backend {
-  val backend = if (requested == Backend.Wayland && System.getenv("WAYLAND_DISPLAY") == null) {
-    logger.warn("--wayland requested but WAYLAND_DISPLAY is not set; falling back to X11")
-    Backend.X11
-  } else {
-    requested
-  }
-
-  when (backend) {
-    Backend.X11 -> {
-      System.setProperty("awt.toolkit.name", "XToolkit")
-      logger.info("Using X11 backend")
+    val backend = if (requested == Backend.Wayland && System.getenv("WAYLAND_DISPLAY") == null) {
+        logger.warn("--wayland requested but WAYLAND_DISPLAY is not set; falling back to X11")
+        Backend.X11
+    } else {
+        requested
     }
 
-    Backend.Wayland -> {
-      System.setProperty("awt.toolkit.name", "WLToolkit")
-      System.setProperty("compose.swing.render.on.graphics", "true")
-      logger.info("Using native Wayland backend (CPU rendering)")
+    when (backend) {
+        Backend.X11 -> {
+            System.setProperty("awt.toolkit.name", "XToolkit")
+            logger.info("Using X11 backend")
+        }
+
+        Backend.Wayland -> {
+            System.setProperty("awt.toolkit.name", "WLToolkit")
+            System.setProperty("compose.swing.render.on.graphics", "true")
+            logger.info("Using native Wayland backend (CPU rendering)")
+        }
     }
-  }
-  return backend
+    return backend
 }

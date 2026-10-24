@@ -38,35 +38,39 @@ private val DEFAULT_SIZE = 200.dp
  */
 @Composable
 fun qrCode(content: String, modifier: Modifier = Modifier, size: Dp = DEFAULT_SIZE) {
-  val matrix = remember(content) { encode(content) }
-  if (matrix == null) {
-    Text("Could not make a QR code.", modifier, style = MaterialTheme.typography.labelMedium)
-    return
-  }
-  Canvas(modifier.size(size)) {
-    val modules = matrix.width + 2 * QUIET_ZONE
-    val module = this.size.width / modules
-    drawRect(Color.White)
-    for (x in 0 until matrix.width) {
-      for (y in 0 until matrix.height) {
-        if (matrix[x, y]) {
-          drawRect(Color.Black, Offset((x + QUIET_ZONE) * module, (y + QUIET_ZONE) * module), Size(module, module))
-        }
-      }
+    val matrix = remember(content) { encode(content) }
+    if (matrix == null) {
+        Text("Could not make a QR code.", modifier, style = MaterialTheme.typography.labelMedium)
+        return
     }
-  }
+    Canvas(modifier.size(size)) {
+        val modules = matrix.width + 2 * QUIET_ZONE
+        val module = this.size.width / modules
+        drawRect(Color.White)
+        for (x in 0 until matrix.width) {
+            for (y in 0 until matrix.height) {
+                if (matrix[x, y]) {
+                    drawRect(
+                        Color.Black,
+                        Offset((x + QUIET_ZONE) * module, (y + QUIET_ZONE) * module),
+                        Size(module, module),
+                    )
+                }
+            }
+        }
+    }
 }
 
 /** [content] as a QR code matrix without its own border; `null` if it can't be encoded. */
 private fun encode(content: String): BitMatrix? = try {
-  QRCodeWriter().encode(
-    content,
-    BarcodeFormat.QR_CODE,
-    0,
-    0,
-    mapOf(EncodeHintType.MARGIN to 0, EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M),
-  )
+    QRCodeWriter().encode(
+        content,
+        BarcodeFormat.QR_CODE,
+        0,
+        0,
+        mapOf(EncodeHintType.MARGIN to 0, EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M),
+    )
 } catch (e: WriterException) {
-  logger.warn("Could not encode a QR code: {}", e.message)
-  null
+    logger.warn("Could not encode a QR code: {}", e.message)
+    null
 }

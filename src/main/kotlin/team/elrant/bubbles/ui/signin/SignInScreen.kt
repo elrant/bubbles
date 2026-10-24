@@ -52,83 +52,83 @@ import team.elrant.bubbles.ui.components.statusSelector
  */
 @Composable
 fun signInScreen(bubbles: Bubbles, onOpenSettings: () -> Unit, modifier: Modifier = Modifier) {
-  var address by remember { mutableStateOf(bubbles.preferences.savedAddress.orEmpty()) }
-  var password by remember { mutableStateOf("") }
-  var status by remember { mutableStateOf(Status.Available) }
-  var rememberMe by remember { mutableStateOf(bubbles.preferences.savedAddress != null) }
-  var rememberPassword by remember { mutableStateOf(false) }
-  var busy by remember { mutableStateOf(false) }
-  var job by remember { mutableStateOf<Job?>(null) }
-  var error by remember { mutableStateOf<String?>(null) }
-  val scope = rememberCoroutineScope()
+    var address by remember { mutableStateOf(bubbles.preferences.savedAddress.orEmpty()) }
+    var password by remember { mutableStateOf("") }
+    var status by remember { mutableStateOf(Status.Available) }
+    var rememberMe by remember { mutableStateOf(bubbles.preferences.savedAddress != null) }
+    var rememberPassword by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var job by remember { mutableStateOf<Job?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
-  fun signIn() {
-    if (busy) return
-    if (address.isBlank() || password.isEmpty()) {
-      error = "Please enter your address and password."
-      return
+    fun signIn() {
+        if (busy) return
+        if (address.isBlank() || password.isEmpty()) {
+            error = "Please enter your address and password."
+            return
+        }
+        busy = true
+        job = scope.launch {
+            try {
+                bubbles.signIn(address.trim(), password, status, rememberMe, rememberPassword)
+            } catch (e: SignInException) {
+                error = "Could not sign in: ${e.message}"
+            } finally {
+                busy = false
+            }
+        }
     }
-    busy = true
-    job = scope.launch {
-      try {
-        bubbles.signIn(address.trim(), password, status, rememberMe, rememberPassword)
-      } catch (e: SignInException) {
-        error = "Could not sign in: ${e.message}"
-      } finally {
-        busy = false
-      }
+
+    // A password kept in the keyring fills the form for the remembered address and signs in, once per run, so
+    // signing out or coming back from the settings doesn't sign in again.
+    LaunchedEffect(Unit) {
+        val signInNow = keptPassword(bubbles) {
+            password = it
+            rememberPassword = true
+        }
+        if (signInNow) signIn()
     }
-  }
 
-  // A password kept in the keyring fills the form for the remembered address and signs in, once per run, so
-  // signing out or coming back from the settings doesn't sign in again.
-  LaunchedEffect(Unit) {
-    val signInNow = keptPassword(bubbles) {
-      password = it
-      rememberPassword = true
+    Surface(modifier.fillMaxSize()) {
+        Column(
+            Modifier.verticalScroll(rememberScrollState()).padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("Bubbles", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(20.dp))
+            displayPicture(address.ifBlank { "?" }, status, 112.dp)
+            Spacer(Modifier.height(24.dp))
+
+            if (busy) {
+                CircularProgressIndicator()
+                Spacer(Modifier.height(12.dp))
+                Text("Signing in…")
+                Spacer(Modifier.height(16.dp))
+                OutlinedButton(onClick = { job?.cancel() }) { Text("Cancel") }
+            } else {
+                signInForm(
+                    address = address, onAddress = { address = it },
+                    password = password, onPassword = { password = it },
+                    status = status, onStatus = { status = it },
+                    rememberMe = rememberMe, onRememberMe = { rememberMe = it },
+                    rememberPassword = rememberPassword, onRememberPassword = { rememberPassword = it },
+                    onSubmit = ::signIn,
+                )
+                Spacer(Modifier.height(8.dp))
+                TextButton(onClick = onOpenSettings) { Text("Settings") }
+            }
+        }
     }
-    if (signInNow) signIn()
-  }
 
-  Surface(modifier.fillMaxSize()) {
-    Column(
-      Modifier.verticalScroll(rememberScrollState()).padding(24.dp),
-      horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-      Text("Bubbles", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
-      Spacer(Modifier.height(20.dp))
-      displayPicture(address.ifBlank { "?" }, status, 112.dp)
-      Spacer(Modifier.height(24.dp))
-
-      if (busy) {
-        CircularProgressIndicator()
-        Spacer(Modifier.height(12.dp))
-        Text("Signing in…")
-        Spacer(Modifier.height(16.dp))
-        OutlinedButton(onClick = { job?.cancel() }) { Text("Cancel") }
-      } else {
-        signInForm(
-          address = address, onAddress = { address = it },
-          password = password, onPassword = { password = it },
-          status = status, onStatus = { status = it },
-          rememberMe = rememberMe, onRememberMe = { rememberMe = it },
-          rememberPassword = rememberPassword, onRememberPassword = { rememberPassword = it },
-          onSubmit = ::signIn,
+    error?.let { message ->
+        AlertDialog(
+            onDismissRequest = { error = null },
+            title = { Text("Bubbles - Sign-in error") },
+            text = { Text(message) },
+            confirmButton = { TextButton(onClick = { error = null }) { Text("OK") } },
         )
-        Spacer(Modifier.height(8.dp))
-        TextButton(onClick = onOpenSettings) { Text("Settings") }
-      }
     }
-  }
-
-  error?.let { message ->
-    AlertDialog(
-      onDismissRequest = { error = null },
-      title = { Text("Bubbles - Sign-in error") },
-      text = { Text(message) },
-      confirmButton = { TextButton(onClick = { error = null }) { Text("OK") } },
-    )
-  }
 }
 
 /**
@@ -136,57 +136,57 @@ fun signInScreen(bubbles: Bubbles, onOpenSettings: () -> Unit, modifier: Modifie
  * right away, which happens only the first time per run.
  */
 private suspend fun keptPassword(bubbles: Bubbles, onFound: (String) -> Unit): Boolean {
-  val kept = bubbles.preferences.savedAddress?.let { bubbles.credentials.saved(it) } ?: return false
-  onFound(kept)
-  return bubbles.credentials.claimAutoSignIn()
+    val kept = bubbles.preferences.savedAddress?.let { bubbles.credentials.saved(it) } ?: return false
+    onFound(kept)
+    return bubbles.credentials.claimAutoSignIn()
 }
 
 /** Stateless address/password/status/"Remember me"/"Remember password" fields; Enter in either text field submits. */
 @Composable
 private fun signInForm(
-  address: String,
-  onAddress: (String) -> Unit,
-  password: String,
-  onPassword: (String) -> Unit,
-  status: Status,
-  onStatus: (Status) -> Unit,
-  rememberMe: Boolean,
-  onRememberMe: (Boolean) -> Unit,
-  rememberPassword: Boolean,
-  onRememberPassword: (Boolean) -> Unit,
-  onSubmit: () -> Unit,
+    address: String,
+    onAddress: (String) -> Unit,
+    password: String,
+    onPassword: (String) -> Unit,
+    status: Status,
+    onStatus: (Status) -> Unit,
+    rememberMe: Boolean,
+    onRememberMe: (Boolean) -> Unit,
+    rememberPassword: Boolean,
+    onRememberPassword: (Boolean) -> Unit,
+    onSubmit: () -> Unit,
 ) {
-  val submit = KeyboardActions(onDone = { onSubmit() })
-  Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-    OutlinedTextField(
-      address, onAddress, Modifier.fillMaxWidth(),
-      label = { Text("Address") }, placeholder = { Text("name@example.org") }, singleLine = true,
-      keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = submit,
-    )
-    OutlinedTextField(
-      password, onPassword, Modifier.fillMaxWidth(),
-      label = { Text("Password") }, singleLine = true,
-      visualTransformation = PasswordVisualTransformation(),
-      keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = submit,
-    )
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      Text("Sign in as:", color = MaterialTheme.colorScheme.onSurfaceVariant)
-      Spacer(Modifier.width(4.dp))
-      statusSelector(onSelect = onStatus) {
-        statusDot(status)
-        Spacer(Modifier.width(6.dp))
-        Text(status.label)
-      }
+    val submit = KeyboardActions(onDone = { onSubmit() })
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        OutlinedTextField(
+            address, onAddress, Modifier.fillMaxWidth(),
+            label = { Text("Address") }, placeholder = { Text("name@example.org") }, singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = submit,
+        )
+        OutlinedTextField(
+            password, onPassword, Modifier.fillMaxWidth(),
+            label = { Text("Password") }, singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = submit,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Sign in as:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(4.dp))
+            statusSelector(onSelect = onStatus) {
+                statusDot(status)
+                Spacer(Modifier.width(6.dp))
+                Text(status.label)
+            }
+        }
+        // Pull the checkbox's built-in touch padding back so it lines up with the fields.
+        Row(Modifier.offset(x = (-12).dp), verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(rememberMe, onRememberMe)
+            Text("Remember me")
+        }
+        Row(Modifier.offset(x = (-12).dp), verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(rememberPassword, onRememberPassword)
+            Text("Remember password in the system keyring")
+        }
+        Button(onClick = onSubmit, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("Sign in") }
     }
-    // Pull the checkbox's built-in touch padding back so it lines up with the fields.
-    Row(Modifier.offset(x = (-12).dp), verticalAlignment = Alignment.CenterVertically) {
-      Checkbox(rememberMe, onRememberMe)
-      Text("Remember me")
-    }
-    Row(Modifier.offset(x = (-12).dp), verticalAlignment = Alignment.CenterVertically) {
-      Checkbox(rememberPassword, onRememberPassword)
-      Text("Remember password in the system keyring")
-    }
-    Button(onClick = onSubmit, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("Sign in") }
-  }
 }

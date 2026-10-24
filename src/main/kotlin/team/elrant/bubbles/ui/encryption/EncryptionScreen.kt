@@ -47,65 +47,68 @@ private const val FINGERPRINT_BLOCK = 8
  */
 @Composable
 fun encryptionScreen(bubbles: Bubbles, onBack: () -> Unit, modifier: Modifier = Modifier) {
-  val own = produceState<OmemoIdentity?>(null, bubbles.user) { value = bubbles.omemoKeys.own() }.value
-  var expanded by remember { mutableStateOf<BareJid?>(null) }
-  val accounts = listOfNotNull(bubbles.user?.jid) + bubbles.contacts.map { it.jid }
-  Surface(modifier.fillMaxSize()) {
-    Column {
-      topBar(onBack)
-      Column(
-        Modifier.verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-      ) {
-        thisDevice(own)
-        HorizontalDivider()
-        Text("Accounts", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-        for (jid in accounts) {
-          accountEntry(bubbles, jid, own?.deviceId, expanded == jid) { expanded = jid.takeIf { it != expanded } }
+    val own = produceState<OmemoIdentity?>(null, bubbles.user) { value = bubbles.omemoKeys.own() }.value
+    var expanded by remember { mutableStateOf<BareJid?>(null) }
+    val accounts = listOfNotNull(bubbles.user?.jid) + bubbles.contacts.map { it.jid }
+    Surface(modifier.fillMaxSize()) {
+        Column {
+            topBar(onBack)
+            Column(
+                Modifier.verticalScroll(rememberScrollState()).padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                thisDevice(own)
+                HorizontalDivider()
+                Text("Accounts", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                for (jid in accounts) {
+                    val toggle = { expanded = jid.takeIf { it != expanded } }
+                    accountEntry(bubbles, jid, own?.deviceId, expanded == jid, toggle)
+                }
+            }
         }
-      }
     }
-  }
 }
 
 /** This device's id and fingerprint, or a note that OMEMO isn't running if [own] is `null`. */
 @Composable
 private fun thisDevice(own: OmemoIdentity?) {
-  Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-    Text("This device", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-    if (own == null) {
-      Text("OMEMO isn't running. It needs a keyring (Secret Service), such as GNOME Keyring, to protect its keys.")
-    } else {
-      Text("Device ${own.deviceId}", style = MaterialTheme.typography.labelLarge)
-      fingerprintText(own.fingerprint)
-      qrToggle(own)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("This device", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+        if (own == null) {
+            Text(
+                "OMEMO isn't running. It needs a keyring (Secret Service), such as GNOME Keyring, to protect its keys.",
+            )
+        } else {
+            Text("Device ${own.deviceId}", style = MaterialTheme.typography.labelLarge)
+            fingerprintText(own.fingerprint)
+            qrToggle(own)
+        }
     }
-  }
 }
 
 /** The name of [jid], which toggles its device list (shown when [expanded]) when clicked. */
 @Composable
 private fun accountEntry(bubbles: Bubbles, jid: BareJid, ownDeviceId: Int?, expanded: Boolean, onToggle: () -> Unit) {
-  val name = if (jid == bubbles.user?.jid) "$jid (your other devices)" else bubbles.contact(jid).displayName
-  Column {
-    Text(
-      name,
-      Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(vertical = 4.dp),
-      style = MaterialTheme.typography.bodyLarge,
-    )
-    if (expanded) deviceList(bubbles, jid, ownDeviceId)
-  }
+    val name = if (jid == bubbles.user?.jid) "$jid (your other devices)" else bubbles.contact(jid).displayName
+    Column {
+        Text(
+            name,
+            Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(vertical = 4.dp),
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        if (expanded) deviceList(bubbles, jid, ownDeviceId)
+    }
 }
 
 /** "← Back" and the screen title. */
 @Composable
 private fun topBar(onBack: () -> Unit) {
-  Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
-    Row(Modifier.fillMaxWidth().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-      TextButton(onClick = onBack) { Text("← Back") }
-      Text("Encryption keys", style = MaterialTheme.typography.titleMedium)
+    Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
+        Row(Modifier.fillMaxWidth().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = onBack) { Text("← Back") }
+            Text("Encryption keys", style = MaterialTheme.typography.titleMedium)
+        }
     }
-  }
 }
 
 /**
@@ -114,60 +117,60 @@ private fun topBar(onBack: () -> Unit) {
  */
 @Composable
 private fun deviceList(bubbles: Bubbles, jid: BareJid, ownDeviceId: Int?, modifier: Modifier = Modifier) {
-  var refresh by remember { mutableIntStateOf(0) }
-  val scope = rememberCoroutineScope()
-  val identities = produceState<List<OmemoIdentity>?>(null, jid, refresh) {
-    value = bubbles.omemoKeys.devicesOf(jid)
-  }.value
-  Column(modifier.padding(start = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-    val shown = identities?.filter { it.jid != bubbles.user?.jid || it.deviceId != ownDeviceId }
-    when {
-      identities == null -> Text("Looking up devices…", style = MaterialTheme.typography.labelMedium)
+    var refresh by remember { mutableIntStateOf(0) }
+    val scope = rememberCoroutineScope()
+    val identities = produceState<List<OmemoIdentity>?>(null, jid, refresh) {
+        value = bubbles.omemoKeys.devicesOf(jid)
+    }.value
+    Column(modifier.padding(start = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        val shown = identities?.filter { it.jid != bubbles.user?.jid || it.deviceId != ownDeviceId }
+        when {
+            identities == null -> Text("Looking up devices…", style = MaterialTheme.typography.labelMedium)
 
-      shown.isNullOrEmpty() -> Text("No OMEMO devices found.", style = MaterialTheme.typography.labelMedium)
+            shown.isNullOrEmpty() -> Text("No OMEMO devices found.", style = MaterialTheme.typography.labelMedium)
 
-      else -> for (identity in shown) {
-        identityRow(identity, onDecide = { trusted ->
-          scope.launch {
-            bubbles.omemoKeys.setTrusted(identity, trusted)
-            refresh++
-          }
-        })
-      }
+            else -> for (identity in shown) {
+                identityRow(identity, onDecide = { trusted ->
+                    scope.launch {
+                        bubbles.omemoKeys.setTrusted(identity, trusted)
+                        refresh++
+                    }
+                })
+            }
+        }
     }
-  }
 }
 
 /** One device: id, trust, fingerprint, and the buttons for the decisions that would change something. */
 @Composable
 private fun identityRow(identity: OmemoIdentity, onDecide: (trusted: Boolean) -> Unit, modifier: Modifier = Modifier) {
-  Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-    Text("Device ${identity.deviceId} - ${identity.trust.label}", style = MaterialTheme.typography.labelLarge)
-    fingerprintText(identity.fingerprint)
-    qrToggle(identity)
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-      OutlinedButton(onClick = { onDecide(true) }, enabled = identity.trust != OmemoIdentity.Trust.Trusted) {
-        Text("Trust")
-      }
-      OutlinedButton(onClick = { onDecide(false) }, enabled = identity.trust != OmemoIdentity.Trust.Untrusted) {
-        Text("Don't trust")
-      }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("Device ${identity.deviceId} - ${identity.trust.label}", style = MaterialTheme.typography.labelLarge)
+        fingerprintText(identity.fingerprint)
+        qrToggle(identity)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { onDecide(true) }, enabled = identity.trust != OmemoIdentity.Trust.Trusted) {
+                Text("Trust")
+            }
+            OutlinedButton(onClick = { onDecide(false) }, enabled = identity.trust != OmemoIdentity.Trust.Untrusted) {
+                Text("Don't trust")
+            }
+        }
     }
-  }
 }
 
 /** A button that shows or hides a QR code of [identity], for another device to scan to compare fingerprints. */
 @Composable
 private fun qrToggle(identity: OmemoIdentity, modifier: Modifier = Modifier) {
-  var shown by remember(identity.uri) { mutableStateOf(false) }
-  Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-    TextButton(onClick = { shown = !shown }) { Text(if (shown) "Hide QR code" else "Show QR code") }
-    if (shown) qrCode(identity.uri)
-  }
+    var shown by remember(identity.uri) { mutableStateOf(false) }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        TextButton(onClick = { shown = !shown }) { Text(if (shown) "Hide QR code" else "Show QR code") }
+        if (shown) qrCode(identity.uri)
+    }
 }
 
 /** [fingerprint] in monospace, in groups of [FINGERPRINT_BLOCK] characters. */
 @Composable
 private fun fingerprintText(fingerprint: String) {
-  Text(fingerprint.chunked(FINGERPRINT_BLOCK).joinToString(" "), fontFamily = FontFamily.Monospace)
+    Text(fingerprint.chunked(FINGERPRINT_BLOCK).joinToString(" "), fontFamily = FontFamily.Monospace)
 }

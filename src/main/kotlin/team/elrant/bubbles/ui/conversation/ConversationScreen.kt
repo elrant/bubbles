@@ -67,7 +67,7 @@ private val DAY_MONTH_YEAR = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 
 /** [this] formatted with [time], preceded by its date as `dd/mm/yyyy` unless it is today. */
 private fun LocalDateTime.stamp(time: DateTimeFormatter): String =
-  if (toLocalDate() == LocalDate.now()) format(time) else "${format(DAY_MONTH_YEAR)} ${format(time)}"
+    if (toLocalDate() == LocalDate.now()) format(time) else "${format(DAY_MONTH_YEAR)} ${format(time)}"
 
 /**
  * Conversation window contents: contact header, history, compose box and both display pictures.
@@ -75,78 +75,79 @@ private fun LocalDateTime.stamp(time: DateTimeFormatter): String =
  */
 @Composable
 fun conversationScreen(bubbles: Bubbles, user: ConnectedUser, contact: Contact, modifier: Modifier = Modifier) {
-  val messages = bubbles.histories[contact.jid].orEmpty()
-  val settings = bubbles.preferences.settings
-  val time = if (settings.use24HourClock) TIME_24H else TIME_12H
-  var draft by remember(contact.jid) { mutableStateOf("") }
-  val now by produceState(Instant.now()) {
-    while (true) {
-      delay(CLOCK_TICK_MS)
-      value = Instant.now()
+    val messages = bubbles.histories[contact.jid].orEmpty()
+    val settings = bubbles.preferences.settings
+    val time = if (settings.use24HourClock) TIME_24H else TIME_12H
+    var draft by remember(contact.jid) { mutableStateOf("") }
+    val now by produceState(Instant.now()) {
+        while (true) {
+            delay(CLOCK_TICK_MS)
+            value = Instant.now()
+        }
     }
-  }
 
-  fun send() {
-    val text = draft.trim()
-    if (text.isEmpty()) return
-    bubbles.sendMessage(contact.jid, text)
-    draft = ""
-  }
-
-  Surface(modifier.fillMaxSize()) {
-    Row {
-      Column(Modifier.weight(1f).fillMaxHeight()) {
-        contactHeader(contact, bubbles.clocks.offset(contact.jid)?.let { "${now.atOffset(it).format(time)} (UTC$it)" })
-        HorizontalDivider()
-        history(
-          messages,
-          selfName = user.username,
-          contactName = contact.displayName,
-          time = time,
-          runGap = Duration.ofMinutes(settings.runGapMinutes.toLong()),
-          modifier = Modifier.weight(1f),
-        )
-        composeBox(draft, { draft = it }, enterSends = settings.enterSends, onSend = ::send)
-        statusBar(messages, time)
-      }
-      VerticalDivider()
-      Column(
-        Modifier.width(128.dp).fillMaxHeight().padding(12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-      ) {
-        displayPicture(contact.displayName, contact.status, 104.dp, picture = bubbles.avatar(contact.jid))
-        Spacer(Modifier.weight(1f))
-        displayPicture(user.username, bubbles.status, 104.dp, picture = bubbles.avatar(user.jid))
-      }
+    fun send() {
+        val text = draft.trim()
+        if (text.isEmpty()) return
+        bubbles.sendMessage(contact.jid, text)
+        draft = ""
     }
-  }
+
+    Surface(modifier.fillMaxSize()) {
+        Row {
+            Column(Modifier.weight(1f).fillMaxHeight()) {
+                val localTime = bubbles.clocks.offset(contact.jid)?.let { "${now.atOffset(it).format(time)} (UTC$it)" }
+                contactHeader(contact, localTime)
+                HorizontalDivider()
+                history(
+                    messages,
+                    selfName = user.username,
+                    contactName = contact.displayName,
+                    time = time,
+                    runGap = Duration.ofMinutes(settings.runGapMinutes.toLong()),
+                    modifier = Modifier.weight(1f),
+                )
+                composeBox(draft, { draft = it }, enterSends = settings.enterSends, onSend = ::send)
+                statusBar(messages, time)
+            }
+            VerticalDivider()
+            Column(
+                Modifier.width(128.dp).fillMaxHeight().padding(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                displayPicture(contact.displayName, contact.status, 104.dp, picture = bubbles.avatar(contact.jid))
+                Spacer(Modifier.weight(1f))
+                displayPicture(user.username, bubbles.status, 104.dp, picture = bubbles.avatar(user.jid))
+            }
+        }
+    }
 }
 
 /** The contact's name, status, personal message and JID, and [localTime] on their clock if known. */
 @Composable
 private fun contactHeader(contact: Contact, localTime: String?) {
-  Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
-    Text(
-      contact.displayName,
-      style = MaterialTheme.typography.titleLarge,
-      maxLines = 1, overflow = TextOverflow.Ellipsis,
-    )
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      statusDot(contact.status, size = 8.dp)
-      Spacer(Modifier.width(6.dp))
-      Text(
-        listOfNotNull(contact.status.label, contact.personalMessage).joinToString(" - "),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1, overflow = TextOverflow.Ellipsis,
-      )
+    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
+        Text(
+            contact.displayName,
+            style = MaterialTheme.typography.titleLarge,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            statusDot(contact.status, size = 8.dp)
+            Spacer(Modifier.width(6.dp))
+            Text(
+                listOfNotNull(contact.status.label, contact.personalMessage).joinToString(" - "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Text(
+            listOfNotNull("<${contact.jid}>", localTime?.let { "Their time: $it" }).joinToString("  -  "),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
-    Text(
-      listOfNotNull("<${contact.jid}>", localTime?.let { "Their time: $it" }).joinToString("  -  "),
-      style = MaterialTheme.typography.labelSmall,
-      color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-  }
 }
 
 /**
@@ -155,56 +156,56 @@ private fun contactHeader(contact: Contact, localTime: String?) {
  */
 @Composable
 private fun history(
-  messages: List<ChatMessage>,
-  selfName: String,
-  contactName: String,
-  time: DateTimeFormatter,
-  runGap: Duration,
-  modifier: Modifier = Modifier,
+    messages: List<ChatMessage>,
+    selfName: String,
+    contactName: String,
+    time: DateTimeFormatter,
+    runGap: Duration,
+    modifier: Modifier = Modifier,
 ) {
-  val listState = rememberLazyListState()
-  LaunchedEffect(messages.size) {
-    if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
-  }
-
-  LazyColumn(modifier.fillMaxWidth().padding(horizontal = 12.dp), state = listState) {
-    itemsIndexed(messages) { index, message ->
-      val previous = messages.getOrNull(index - 1)
-      val startsRun = previous == null ||
-        previous.outgoing != message.outgoing ||
-        Duration.between(previous.time, message.time) > runGap
-      val sender = if (message.outgoing) selfName else contactName
-      Column {
-        if (startsRun) {
-          Row(Modifier.fillMaxWidth().padding(top = 8.dp)) {
-            Text(
-              "$sender says:",
-              Modifier.weight(1f),
-              style = MaterialTheme.typography.labelLarge,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-              message.time.stamp(time),
-              style = MaterialTheme.typography.labelSmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-          }
-        }
-        contextMenuBox(
-          menu = { close ->
-            menuItem("Copy message", onClose = close, onClick = { copyToClipboard(message.body) })
-            menuItem(
-              "Copy with sender and time",
-              onClose = close,
-              onClick = { copyToClipboard("[${message.time.stamp(time)}] $sender: ${message.body}") },
-            )
-          },
-        ) {
-          messageText(message)
-        }
-      }
+    val listState = rememberLazyListState()
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
     }
-  }
+
+    LazyColumn(modifier.fillMaxWidth().padding(horizontal = 12.dp), state = listState) {
+        itemsIndexed(messages) { index, message ->
+            val previous = messages.getOrNull(index - 1)
+            val startsRun = previous == null ||
+                previous.outgoing != message.outgoing ||
+                Duration.between(previous.time, message.time) > runGap
+            val sender = if (message.outgoing) selfName else contactName
+            Column {
+                if (startsRun) {
+                    Row(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                        Text(
+                            "$sender says:",
+                            Modifier.weight(1f),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            message.time.stamp(time),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                contextMenuBox(
+                    menu = { close ->
+                        menuItem("Copy message", onClose = close, onClick = { copyToClipboard(message.body) })
+                        menuItem(
+                            "Copy with sender and time",
+                            onClose = close,
+                            onClick = { copyToClipboard("[${message.time.stamp(time)}] $sender: ${message.body}") },
+                        )
+                    },
+                ) {
+                    messageText(message)
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -214,40 +215,40 @@ private fun history(
  */
 @Composable
 private fun messageText(message: ChatMessage) {
-  Column(Modifier.fillMaxWidth().padding(start = 16.dp, top = 2.dp)) {
-    Row(verticalAlignment = Alignment.Top) {
-      Text(message.body, Modifier.weight(1f))
-      if (message.outgoing) receiptIcon(message.receipt(), Modifier.padding(start = 6.dp, top = 4.dp))
+    Column(Modifier.fillMaxWidth().padding(start = 16.dp, top = 2.dp)) {
+        Row(verticalAlignment = Alignment.Top) {
+            Text(message.body, Modifier.weight(1f))
+            if (message.outgoing) receiptIcon(message.receipt(), Modifier.padding(start = 6.dp, top = 4.dp))
+        }
+        val banner = when {
+            message.failed -> "Not sent"
+            message.pending || message.encrypted -> null
+            else -> "Not encrypted"
+        }
+        if (banner != null) banner(banner, isError = message.failed)
     }
-    val banner = when {
-      message.failed -> "Not sent"
-      message.pending || message.encrypted -> null
-      else -> "Not encrypted"
-    }
-    if (banner != null) banner(banner, isError = message.failed)
-  }
 }
 
 /** How far this outgoing message has got. */
 private fun ChatMessage.receipt(): Receipt = when {
-  failed -> Receipt.Failed
-  pending -> Receipt.Sending
-  read -> Receipt.Read
-  else -> Receipt.Sent
+    failed -> Receipt.Failed
+    pending -> Receipt.Sending
+    read -> Receipt.Read
+    else -> Receipt.Sent
 }
 
 /** A small label with [text] under a message; red if [isError]. */
 @Composable
 private fun banner(text: String, isError: Boolean) {
-  val colors = MaterialTheme.colorScheme
-  Surface(
-    Modifier.padding(top = 2.dp),
-    shape = MaterialTheme.shapes.extraSmall,
-    color = if (isError) colors.errorContainer else colors.surfaceVariant,
-    contentColor = if (isError) colors.onErrorContainer else colors.onSurfaceVariant,
-  ) {
-    Text(text, Modifier.padding(horizontal = 6.dp, vertical = 1.dp), style = MaterialTheme.typography.labelSmall)
-  }
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        Modifier.padding(top = 2.dp),
+        shape = MaterialTheme.shapes.extraSmall,
+        color = if (isError) colors.errorContainer else colors.surfaceVariant,
+        contentColor = if (isError) colors.onErrorContainer else colors.onSurfaceVariant,
+    ) {
+        Text(text, Modifier.padding(horizontal = 6.dp, vertical = 1.dp), style = MaterialTheme.typography.labelSmall)
+    }
 }
 
 /**
@@ -256,32 +257,32 @@ private fun banner(text: String, isError: Boolean) {
  */
 @Composable
 private fun composeBox(draft: String, onDraftChange: (String) -> Unit, enterSends: Boolean, onSend: () -> Unit) {
-  Row(
-    Modifier.padding(8.dp),
-    horizontalArrangement = Arrangement.spacedBy(8.dp),
-    verticalAlignment = Alignment.CenterVertically,
-  ) {
-    OutlinedTextField(
-      draft, onDraftChange,
-      Modifier.weight(1f).onPreviewKeyEvent {
-        val send = it.key == Key.Enter && if (enterSends) !it.isShiftPressed else it.isCtrlPressed
-        if (send && it.type == KeyEventType.KeyDown) onSend()
-        send
-      },
-      minLines = 3, maxLines = 5,
-    )
-    Button(onClick = onSend) { Text("Send") }
-  }
+    Row(
+        Modifier.padding(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        OutlinedTextField(
+            draft, onDraftChange,
+            Modifier.weight(1f).onPreviewKeyEvent {
+                val send = it.key == Key.Enter && if (enterSends) !it.isShiftPressed else it.isCtrlPressed
+                if (send && it.type == KeyEventType.KeyDown) onSend()
+                send
+            },
+            minLines = 3, maxLines = 5,
+        )
+        Button(onClick = onSend) { Text("Send") }
+    }
 }
 
 /** When the last incoming message arrived, formatted with [time]; hidden until there is one. */
 @Composable
 private fun statusBar(messages: List<ChatMessage>, time: DateTimeFormatter) {
-  val last = messages.lastOrNull { !it.outgoing } ?: return
-  Text(
-    "Last message received at ${last.time.format(time)} on ${last.time.format(DATE)}.",
-    Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-    style = MaterialTheme.typography.labelSmall,
-    color = MaterialTheme.colorScheme.onSurfaceVariant,
-  )
+    val last = messages.lastOrNull { !it.outgoing } ?: return
+    Text(
+        "Last message received at ${last.time.format(time)} on ${last.time.format(DATE)}.",
+        Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }

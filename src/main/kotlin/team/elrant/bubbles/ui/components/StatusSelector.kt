@@ -29,33 +29,33 @@ import team.elrant.bubbles.model.Status
  */
 @Composable
 fun statusSelector(
-  onSelect: (Status) -> Unit,
-  modifier: Modifier = Modifier,
-  onOpenSettings: (() -> Unit)? = null,
-  onSignOut: (() -> Unit)? = null,
-  content: @Composable () -> Unit,
+    onSelect: (Status) -> Unit,
+    modifier: Modifier = Modifier,
+    onOpenSettings: (() -> Unit)? = null,
+    onSignOut: (() -> Unit)? = null,
+    content: @Composable () -> Unit,
 ) {
-  var expanded by remember { mutableStateOf(false) }
-  Box(modifier) {
-    Row(
-      Modifier
-        .clip(RoundedCornerShape(4.dp))
-        .clickable { expanded = true }
-        .padding(horizontal = 4.dp, vertical = 2.dp),
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      content()
-      Text(" ▾")
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier) {
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(4.dp))
+                .clickable { expanded = true }
+                .padding(horizontal = 4.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            content()
+            Text(" ▾")
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            statusMenuItems(
+                onSelect = onSelect,
+                onClose = { expanded = false },
+                onOpenSettings = onOpenSettings,
+                onSignOut = onSignOut,
+            )
+        }
     }
-    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-      statusMenuItems(
-        onSelect = onSelect,
-        onClose = { expanded = false },
-        onOpenSettings = onOpenSettings,
-        onSignOut = onSignOut,
-      )
-    }
-  }
 }
 
 /**
@@ -64,44 +64,44 @@ fun statusSelector(
  */
 @Composable
 internal fun statusMenuItems(
-  onSelect: (Status) -> Unit,
-  onClose: () -> Unit,
-  modifier: Modifier = Modifier,
-  onOpenSettings: (() -> Unit)? = null,
-  onSignOut: (() -> Unit)? = null,
+    onSelect: (Status) -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+    onOpenSettings: (() -> Unit)? = null,
+    onSignOut: (() -> Unit)? = null,
 ) {
-  // One Column so the items are a single emitter, whatever menu they're placed in.
-  Column(modifier) {
-    for (status in Status.selectable) {
-      DropdownMenuItem(
-        text = {
-          Row(verticalAlignment = Alignment.CenterVertically) {
-            statusDot(status)
-            Spacer(Modifier.width(8.dp))
-            Text(status.label)
-          }
-        },
-        onClick = {
-          onClose()
-          onSelect(status)
-        },
-      )
+    // One Column so the items are a single emitter, whatever menu they're placed in.
+    Column(modifier) {
+        for (status in Status.selectable) {
+            DropdownMenuItem(
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        statusDot(status)
+                        Spacer(Modifier.width(8.dp))
+                        Text(status.label)
+                    }
+                },
+                onClick = {
+                    onClose()
+                    onSelect(status)
+                },
+            )
+        }
+        if (onOpenSettings != null || onSignOut != null) HorizontalDivider()
+        if (onOpenSettings != null) menuItem("Settings…", onClose, onClick = onOpenSettings)
+        if (onSignOut != null) menuItem("Sign out", onClose, onClick = onSignOut)
     }
-    if (onOpenSettings != null || onSignOut != null) HorizontalDivider()
-    if (onOpenSettings != null) menuItem("Settings…", onClose, onClick = onOpenSettings)
-    if (onSignOut != null) menuItem("Sign out", onClose, onClick = onSignOut)
-  }
 }
 
 /** A plain-text [DropdownMenuItem] that calls [onClose], then [onClick]. */
 @Composable
 fun menuItem(text: String, onClose: () -> Unit, onClick: () -> Unit, modifier: Modifier = Modifier) {
-  DropdownMenuItem(
-    text = { Text(text) },
-    onClick = {
-      onClose()
-      onClick()
-    },
-    modifier = modifier,
-  )
+    DropdownMenuItem(
+        text = { Text(text) },
+        onClick = {
+            onClose()
+            onClick()
+        },
+        modifier = modifier,
+    )
 }

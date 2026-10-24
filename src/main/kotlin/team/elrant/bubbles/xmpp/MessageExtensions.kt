@@ -10,4 +10,4 @@ internal fun Message.isMarkable(): Boolean = ChatMarkersElements.MarkableExtensi
 
 /** Whether this message carries an OMEMO payload. */
 internal fun Message.isOmemo(): Boolean =
-  hasExtension(OmemoElement.NAME_ENCRYPTED, OmemoConstants.OMEMO_NAMESPACE_V_AXOLOTL)
+    hasExtension(OmemoElement.NAME_ENCRYPTED, OmemoConstants.OMEMO_NAMESPACE_V_AXOLOTL)

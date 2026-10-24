@@ -31,36 +31,36 @@ private val CONVERSATION_WINDOW_MIN_SIZE = Dimension(480, 360)
  * Call on the Swing thread.
  */
 fun showBubbles(bubbles: Bubbles) {
-  val confirmExit = mutableStateOf(false)
-  val showSettings = mutableStateOf(false)
-  val showEncryption = mutableStateOf(false)
-  val openSettings = { showSettings.value = true }
-  createWindow(
-    title = "Bubbles",
-    size = MAIN_WINDOW_SIZE,
-    minimumSize = MAIN_WINDOW_MIN_SIZE,
-    settings = { bubbles.preferences.settings },
-    onCloseRequest = { confirmExit.value = true },
-  ) {
-    val user = bubbles.user
-    when {
-      showEncryption.value -> encryptionScreen(bubbles, onBack = { showEncryption.value = false })
+    val confirmExit = mutableStateOf(false)
+    val showSettings = mutableStateOf(false)
+    val showEncryption = mutableStateOf(false)
+    val openSettings = { showSettings.value = true }
+    createWindow(
+        title = "Bubbles",
+        size = MAIN_WINDOW_SIZE,
+        minimumSize = MAIN_WINDOW_MIN_SIZE,
+        settings = { bubbles.preferences.settings },
+        onCloseRequest = { confirmExit.value = true },
+    ) {
+        val user = bubbles.user
+        when {
+            showEncryption.value -> encryptionScreen(bubbles, onBack = { showEncryption.value = false })
 
-      showSettings.value -> settingsScreen(
-        bubbles,
-        onBack = { showSettings.value = false },
-        onOpenEncryption = { showEncryption.value = true },
-      )
+            showSettings.value -> settingsScreen(
+                bubbles,
+                onBack = { showSettings.value = false },
+                onOpenEncryption = { showEncryption.value = true },
+            )
 
-      user == null -> signInScreen(bubbles, onOpenSettings = openSettings)
+            user == null -> signInScreen(bubbles, onOpenSettings = openSettings)
 
-      else -> contactListScreen(bubbles, user, onOpenSettings = openSettings)
-    }
-    if (confirmExit.value) {
-      confirmExitDialog(onConfirm = { exitApplication(bubbles) }, onDismiss = { confirmExit.value = false })
-    }
-    conversationWindows(bubbles)
-  }.isVisible = true
+            else -> contactListScreen(bubbles, user, onOpenSettings = openSettings)
+        }
+        if (confirmExit.value) {
+            confirmExitDialog(onConfirm = { exitApplication(bubbles) }, onDismiss = { confirmExit.value = false })
+        }
+        conversationWindows(bubbles)
+    }.isVisible = true
 }
 
 /**
@@ -72,35 +72,35 @@ fun showBubbles(bubbles: Bubbles) {
  * where exiting right after disposing races Skiko's OpenGL teardown and can hang in native code.
  */
 fun exitApplication(bubbles: Bubbles) {
-  SwingUtilities.invokeLater {
-    if (Toolkit.getDefaultToolkit().javaClass.name == "sun.awt.wl.WLToolkit") {
-      Window.getWindows().forEach(Window::dispose)
+    SwingUtilities.invokeLater {
+        if (Toolkit.getDefaultToolkit().javaClass.name == "sun.awt.wl.WLToolkit") {
+            Window.getWindows().forEach(Window::dispose)
+        }
+        thread(name = "Bubbles-Exit") {
+            bubbles.shutdown()
+            exitProcess(0)
+        }
     }
-    thread(name = "Bubbles-Exit") {
-      bubbles.shutdown()
-      exitProcess(0)
-    }
-  }
 }
 
 /** One window per [Bubbles.conversations] entry; closing a window closes its conversation. */
 @Composable
 private fun conversationWindows(bubbles: Bubbles) {
-  val user = bubbles.user ?: return
-  for (jid in bubbles.conversations) {
-    key(jid) {
-      val contact = bubbles.contact(jid)
-      bubblesWindow(
-        title = "${contact.displayName} - Conversation",
-        size = CONVERSATION_WINDOW_SIZE,
-        minimumSize = CONVERSATION_WINDOW_MIN_SIZE,
-        settings = bubbles.preferences.settings,
-        onCloseRequest = { bubbles.closeConversation(jid) },
-        attention = bubbles.incoming[jid] ?: 0,
-        onFocusChange = { bubbles.conversationFocused(jid, it) },
-      ) {
-        conversationScreen(bubbles, user, contact)
-      }
+    val user = bubbles.user ?: return
+    for (jid in bubbles.conversations) {
+        key(jid) {
+            val contact = bubbles.contact(jid)
+            bubblesWindow(
+                title = "${contact.displayName} - Conversation",
+                size = CONVERSATION_WINDOW_SIZE,
+                minimumSize = CONVERSATION_WINDOW_MIN_SIZE,
+                settings = bubbles.preferences.settings,
+                onCloseRequest = { bubbles.closeConversation(jid) },
+                attention = bubbles.incoming[jid] ?: 0,
+                onFocusChange = { bubbles.conversationFocused(jid, it) },
+            ) {
+                conversationScreen(bubbles, user, contact)
+            }
+        }
     }
-  }
 }

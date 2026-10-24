@@ -28,29 +28,29 @@ import androidx.compose.ui.input.key.type
  */
 @Composable
 fun textPromptDialog(
-  title: String,
-  label: String,
-  confirmText: String,
-  onConfirm: (String) -> Unit,
-  onDismiss: () -> Unit,
+    title: String,
+    label: String,
+    confirmText: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
 ) {
-  var text by remember { mutableStateOf("") }
-  val valid = text.isNotBlank()
-  AlertDialog(
-    onDismissRequest = onDismiss,
-    title = { Text(title) },
-    text = {
-      OutlinedTextField(
-        text, { text = it },
-        Modifier.onPreviewKeyEvent {
-          val enter = it.key == Key.Enter
-          if (enter && valid && it.type == KeyEventType.KeyDown) onConfirm(text.trim())
-          enter
+    var text by remember { mutableStateOf("") }
+    val valid = text.isNotBlank()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            OutlinedTextField(
+                text, { text = it },
+                Modifier.onPreviewKeyEvent {
+                    val enter = it.key == Key.Enter
+                    if (enter && valid && it.type == KeyEventType.KeyDown) onConfirm(text.trim())
+                    enter
+                },
+                label = { Text(label) }, singleLine = true,
+            )
         },
-        label = { Text(label) }, singleLine = true,
-      )
-    },
-    confirmButton = { TextButton(onClick = { onConfirm(text.trim()) }, enabled = valid) { Text(confirmText) } },
-    dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-  )
+        confirmButton = { TextButton(onClick = { onConfirm(text.trim()) }, enabled = valid) { Text(confirmText) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
