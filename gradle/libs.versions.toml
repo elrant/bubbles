@@ -21,7 +21,7 @@ zxing = "3.5.4"
 # kotlin / compose
 kotlin = "2.4.21"
 compose = "1.12.2"
-coroutines = "1.10.2"
+coroutines = "1.11.0"
 shadow = "9.6.1"
 
 # lint
