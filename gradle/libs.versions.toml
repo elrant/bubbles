@@ -2,7 +2,7 @@
 # serialization
 jackson             = "3.2.4"
 jackson-annotations = "2.22"
-jackson-bom         = "3.2.0"
+jackson-bom         = "3.2.4"
 jackson-parent      = "2.22"
 
 # logging
