@@ -12,7 +12,7 @@ tinylog = "2.8.1"
 # xmpp
 jxmpp = "1.1.0"
 mdns = "1.1.1"
-smack = "4.5.0-rc1"
+smack = "4.6.0-alpha1"
 bcprov = "1.85"
 signal = "2.8.1"
 dbus = "5.2.2"
